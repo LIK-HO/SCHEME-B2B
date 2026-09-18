@@ -86,8 +86,26 @@ class JsonUrlSource(CandidateSource):
 
 def build_sources(settings: Settings) -> list[CandidateSource]:
     sources: list[CandidateSource] = []
+
     if settings.source_json_file:
         sources.append(JsonFileSource(settings.source_json_file))
     if settings.source_json_url:
         sources.append(JsonUrlSource(settings.source_json_url, settings.source_timeout_seconds))
+
+    if settings.fns_rsmp_path:
+        from .registry import FNSBulkSource
+
+        sources.append(FNSBulkSource(settings.fns_rsmp_path, only_moscow=True))
+
+    if settings.rosstat_registry_path:
+        from .opendata import OpenDataCsvSource
+
+        sources.append(
+            OpenDataCsvSource(
+                settings.rosstat_registry_path,
+                "Росстат — Статистический регистр хозяйствующих субъектов",
+                only_moscow=True,
+            )
+        )
+
     return sources
