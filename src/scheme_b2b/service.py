@@ -188,7 +188,6 @@ class SearchService:
                 counters["duplicates"] += 1
                 duplicate_locations.setdefault(inn, []).append("текущий запуск")
                 return
-            seen_batch.add(inn)
 
             dedup = self.dedup.check(inn)
             if dedup.duplicate:
@@ -198,10 +197,18 @@ class SearchService:
 
             fns = self.fns.verify(inn, validation.ogrn, validation.ogrnip)
             if self.settings.require_fns_confirmation and not fns.confirmed:
+                if fns.status == "Ошибка":
+                    counters["errors"] += 1
+                    rejected_reasons[f"Проверка ФНС: {fns.message}"] = (
+                        rejected_reasons.get(f"Проверка ФНС: {fns.message}", 0) + 1
+                    )
+                    return
                 counters["rejected"] += 1
                 rejected_reasons[fns.message] = rejected_reasons.get(fns.message, 0) + 1
+                seen_batch.add(inn)
                 return
 
+            seen_batch.add(inn)
             level, score = priority(candidate, validation, fns.confirmed)
             comment_parts = [
                 candidate.comment,
@@ -209,32 +216,48 @@ class SearchService:
                 f"ФНС: {fns.status}",
             ]
 
-            self.airtable.create_record(
-                self.settings.airtable_table_companies,
-                {
-                    "Компания": candidate.company,
-                    "ИНН": inn,
-                    "ОГРН": validation.ogrn,
-                    "ОГРНИП": validation.ogrnip,
-                    "Город": candidate.city,
-                    "Сфера": candidate.sector,
-                    "Потребность": candidate.need,
-                    "Телефон": candidate.phone,
-                    "Почта": candidate.email,
-                    "Сайт": candidate.website,
-                    "Ответственный": candidate.responsible,
-                    "Статус": "Ожидает",
-                    "Источник": candidate.source,
-                    "Приоритет": level,
-                    "Дата обнаружения": now_msk().date().isoformat(),
-                    "Дата проверки": now_msk().date().isoformat(),
-                    "Комментарий": "; ".join(x for x in comment_parts if x),
-                    "Проверка ФНС": fns.status,
-                    "Дата проверки ФНС": now_msk().date().isoformat(),
-                    "Источник проверки ФНС": fns.source_url,
-                    "Результат проверки ФНС": fns.message,
-                },
-            )
+            company_fields = {
+                "Компания": candidate.company,
+                "ИНН": inn,
+                "ОГРН": validation.ogrn,
+                "ОГРНИП": validation.ogrnip,
+                "Город": candidate.city,
+                "Сфера": candidate.sector,
+                "Потребность": candidate.need,
+                "Телефон": candidate.phone,
+                "Почта": candidate.email,
+                "Сайт": candidate.website,
+                "Ответственный": candidate.responsible,
+                "Статус": "Ожидает",
+                "Источник": candidate.source,
+                "Приоритет": level,
+                "Дата обнаружения": now_msk().date().isoformat(),
+                "Дата проверки": now_msk().date().isoformat(),
+                "Комментарий": "; ".join(x for x in comment_parts if x),
+                "Проверка ФНС": fns.status,
+                "Дата проверки ФНС": now_msk().date().isoformat(),
+                "Источник проверки ФНС": fns.source_url,
+                "Результат проверки ФНС": fns.message,
+            }
+            try:
+                self.airtable.create_record(
+                    self.settings.airtable_table_companies,
+                    company_fields,
+                )
+            except Exception as exc:
+                try:
+                    if not self.airtable.exists_by_inn(
+                        self.settings.airtable_table_companies,
+                        inn,
+                    ):
+                        raise exc
+                    logger.warning(
+                        "Airtable create outcome ambiguous; record already exists for INN %s",
+                        inn,
+                    )
+                except Exception:
+                    raise
+
             counters["inserted"] += 1
 
         except Exception:
