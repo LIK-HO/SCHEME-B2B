@@ -99,7 +99,10 @@ def is_moscow(root: ET.Element) -> bool:
 
 def candidate_from_registry_element(root: ET.Element, source: str) -> Candidate | None:
     tag = local_name(root.tag)
-    if tag not in {"СвЮЛ", "СвИП", "СвЮЛСведения", "СвИПСведения"}:
+    has_inn = bool(_first_attr(root.attrib, "ИНН", "ИННЮЛ", "ИННФЛ", "ИННИП"))
+    has_entity_id = bool(_first_attr(root.attrib, "ОГРН", "ОГРНИП"))
+    is_registry_person = tag in {"СвЮЛ", "СвИП", "СвЮЛСведения", "СвИПСведения"}
+    if not is_registry_person and not (has_inn and has_entity_id):
         return None
 
     inn = _first_attr(root.attrib, "ИНН", "ИННЮЛ", "ИННФЛ", "ИННИП")
