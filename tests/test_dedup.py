@@ -8,6 +8,9 @@ class FakeStore:
     def exists_by_inn(self, table_id: str, inn: str) -> bool:
         return (table_id, inn) in self.existing
 
+    def list_inn_keys(self, table_id: str) -> set[str]:
+        return {inn for table, inn in self.existing if table == table_id}
+
 
 def test_global_dedup_checks_all_three_lists():
     store = FakeStore({
@@ -29,5 +32,12 @@ def test_global_dedup_checks_all_three_lists():
 def test_global_dedup_finds_archive_match():
     store = FakeStore({("archive", "5401000000")})
     service = GlobalDeduplicator(store, "companies", "clients", "archive")
+    result = service.check("5401000000")
+    assert result.duplicate_in_archive
+
+def test_global_dedup_uses_primed_snapshot():
+    store = FakeStore({("companies", "7707083893"), ("archive", "5401000000")})
+    service = GlobalDeduplicator(store, "companies", "clients", "archive")
+    service.prime()
     result = service.check("5401000000")
     assert result.duplicate_in_archive
