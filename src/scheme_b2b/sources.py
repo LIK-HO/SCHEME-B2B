@@ -41,6 +41,8 @@ class CandidateSource:
 
 
 def candidate_from_mapping(item: dict[str, Any], source_name: str = "") -> Candidate:
+    phone = normalize_phone(str(item.get("phone") or item.get("Телефон") or ""))
+    email = normalize_email(str(item.get("email") or item.get("Почта") or ""))
     return Candidate(
         company=normalize_name(str(item.get("company") or item.get("Компания") or "")),
         inn=str(item.get("inn") or item.get("ИНН") or ""),
@@ -49,8 +51,8 @@ def candidate_from_mapping(item: dict[str, Any], source_name: str = "") -> Candi
         city=normalize_name(str(item.get("city") or item.get("Город") or "Москва")),
         sector=normalize_name(str(item.get("sector") or item.get("Сфера") or "Другое")) or "Другое",
         need=normalize_name(str(item.get("need") or item.get("Потребность") or "")),
-        phone=(phone if is_valid_phone(phone) else ""),
-        email=(email if is_valid_email(email) else ""),
+        phone=phone if is_valid_phone(phone) else "",
+        email=email if is_valid_email(email) else "",
         website=normalize_website(str(item.get("website") or item.get("Сайт") or "")),
         responsible=normalize_name(str(item.get("responsible") or item.get("Ответственный") or "")),
         source=normalize_name(str(item.get("source") or item.get("Источник") or source_name)),
