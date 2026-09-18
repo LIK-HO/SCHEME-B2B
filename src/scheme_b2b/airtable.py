@@ -88,7 +88,8 @@ class AirtableClient:
         return records
 
     def exists_by_inn(self, table_id: str, inn: str) -> bool:
-        formula = f'{{Ключ ИНН}}="{inn}"'
+        key = normalize_inn(inn)
+        formula = f'{{Ключ ИНН}}="{key}"'
         payload = self._request(
             "GET",
             table_id,
