@@ -5,8 +5,6 @@ import xml.etree.ElementTree as ET
 from scheme_b2b.fns import FNSVerifier
 from scheme_b2b.registry import FNSBulkSource, candidate_from_registry_element
 
-
-
 def test_registry_element_to_candidate():
     xml = ET.fromstring(
         '<СвЮЛ ИНН="7707083893" ОГРН="1027700132195" '
@@ -21,8 +19,6 @@ def test_registry_element_to_candidate():
     assert candidate.city == "Москва"
     assert candidate.sector == "Логистика"
 
-
-
 def test_rsmp_record_variant_is_accepted():
     xml = ET.fromstring(
         '<Запись ИНН="7707083893" ОГРН="1027700132195" НаимЮЛПолн="ООО РОМАШКА" КодРегион="77"/>'
@@ -30,8 +26,6 @@ def test_rsmp_record_variant_is_accepted():
     candidate = candidate_from_registry_element(xml, "ФНС — Единый реестр МСП")
     assert candidate is not None
     assert candidate.inn == "7707083893"
-
-
 
 def test_bulk_source_reads_xml(tmp_path: Path):
     path = tmp_path / "sample.xml"
@@ -44,7 +38,6 @@ def test_bulk_source_reads_xml(tmp_path: Path):
     assert len(candidates) == 1
     assert candidates[0].inn == "7707083893"
 
-
 def test_bulk_source_reads_generic_record_variant(tmp_path: Path):
     path = tmp_path / "sample.xml"
     path.write_text(
@@ -55,8 +48,6 @@ def test_bulk_source_reads_generic_record_variant(tmp_path: Path):
     candidates = FNSBulkSource(str(path)).load()
     assert len(candidates) == 1
     assert candidates[0].inn == "7707083893"
-
-
 
 def test_bulk_fns_verifier_confirms_exact_match(tmp_path: Path):
     path = tmp_path / "sample.xml"
@@ -76,7 +67,6 @@ def test_bulk_fns_verifier_confirms_exact_match(tmp_path: Path):
     result = FNSVerifier(Settings()).verify("7707083893", "1027700132195")
     assert result.confirmed
     assert result.status == "Подтверждена"
-
 
 def test_bulk_source_reads_zip_stream(tmp_path: Path):
     path = tmp_path / "sample.zip"
