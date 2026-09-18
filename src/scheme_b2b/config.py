@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     search_profile_name: str = "Москва B2B — базовый"
     source_json_file: str = ""
     source_json_url: str = ""
+    fns_rsmp_path: str = ""
+    fns_egrul_bulk_path: str = ""
+    rosstat_registry_path: str = ""
     source_timeout_seconds: float = 30
 
     fns_mode: str = "checksum"
