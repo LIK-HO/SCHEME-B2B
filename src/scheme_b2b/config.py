@@ -57,6 +57,10 @@ class Settings(BaseSettings):
 
     local_db_url: str = Field(default="sqlite:///data/scheme_b2b.sqlite3")
     fns_index_db_url: str = Field(default="sqlite:///data/fns_index.sqlite3")
+    fns_index_max_age_hours: float = 48
+
+    outbox_lease_seconds: int = 600
+    outbox_jitter_ratio: float = 0.2
 
     @property
     def local_db_path(self) -> Path | None:
