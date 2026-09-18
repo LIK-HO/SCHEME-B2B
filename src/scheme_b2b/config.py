@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     outbox_lease_seconds: int = 600
     outbox_jitter_ratio: float = 0.2
 
+    max_candidates_per_source: int = 2000
+    max_new_records_per_run: int = 100
+
     @property
     def local_db_path(self) -> Path | None:
         if not self.local_db_url.startswith("sqlite:///"):
