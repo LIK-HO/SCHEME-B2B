@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 
 from .config import Settings
+from .normalization import normalize_inn
 
 
 class AirtableError(RuntimeError):
@@ -153,7 +154,7 @@ class AirtableClient:
         keys: set[str] = set()
         for record in records:
             fields = record.get("fields", {})
-            key = str(fields.get("Ключ ИНН") or fields.get("ИНН") or "").strip()
+            key = normalize_inn(str(fields.get("Ключ ИНН") or fields.get("ИНН") or ""))
             if key:
                 keys.add(key)
         return keys
