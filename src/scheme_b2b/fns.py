@@ -5,8 +5,8 @@ import httpx
 
 from .config import Settings
 from .normalization import normalize_ogrn, normalize_ogrnip
-from .time_utils import now_utc
 from .registry import FNSBulkSource
+from .time_utils import now_utc
 from .validation import RequisitesValidation, validate_requisites
 
 
@@ -57,7 +57,12 @@ class FNSVerifier:
 
             index = FNSIndex(self.settings.fns_index_db_url)
             if not index.is_fresh(self.settings.fns_index_max_age_hours, now_utc()):
-                return FNSResult("Не подтверждена", False, "Индекс ФНС отсутствует или устарел; актуальный snapshot не подтверждён.", "https://www.nalog.gov.ru/rn77/service/egrip2/")
+                return FNSResult(
+                    "Не подтверждена",
+                    False,
+                    "Индекс ФНС отсутствует или устарел; актуальный snapshot не подтверждён.",
+                    "https://www.nalog.gov.ru/rn77/service/egrip2/",
+                )
             row = index.get(local.inn, local.ogrn, local.ogrnip)
         except Exception as exc:
             return FNSResult("Ошибка", False, f"Ошибка доступа к индексу ФНС: {exc}")
