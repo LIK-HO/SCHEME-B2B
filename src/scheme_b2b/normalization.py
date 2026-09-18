@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 
 
 def digits(value: str | None) -> str:
-    return re.sub(r"\\D+", "", value or "")
+    return re.sub(r"\D+", "", value or "")
 
 
 def normalize_inn(value: str | None) -> str:
@@ -22,7 +22,7 @@ def normalize_ogrnip(value: str | None) -> str:
 
 
 def normalize_name(value: str | None) -> str:
-    return re.sub(r"\\s+", " ", (value or "").strip())
+    return re.sub(r"\s+", " ", (value or "").strip())
 
 
 def normalize_email(value: str | None) -> str:
@@ -31,7 +31,7 @@ def normalize_email(value: str | None) -> str:
 
 def is_valid_email(value: str | None) -> bool:
     email = normalize_email(value)
-    return bool(re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", email))
+    return bool(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email))
 
 
 def normalize_phone(value: str | None) -> str:
