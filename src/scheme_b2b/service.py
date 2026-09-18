@@ -78,6 +78,7 @@ class SearchService:
                     rejected_reasons,
                     source_errors,
                     source_limits_hit,
+                    new_limit_hit,
                 )
                 counters["errors"] = 1
                 self._update_run_log(run_id, "error", counters, summary)
@@ -147,7 +148,7 @@ class SearchService:
 
             if profile:
                 self._mark_profile_run(profile)
-            self._enqueue_summary(profile, summary)
+            self._enqueue_summary(profile, run_id, summary)
 
             return {"status": run_status, "run_id": run_id, **counters, "summary": summary}
 
