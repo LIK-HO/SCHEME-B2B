@@ -1,4 +1,5 @@
 from scheme_b2b.dedup import GlobalDeduplicator
+from scheme_b2b.normalization import normalize_inn
 
 
 class FakeStore:
@@ -9,7 +10,7 @@ class FakeStore:
         return (table_id, inn) in self.existing
 
     def list_inn_keys(self, table_id: str) -> set[str]:
-        return {inn for table, inn in self.existing if table == table_id}
+        return {normalize_inn(inn) for table, inn in self.existing if table == table_id}
 
 
 
