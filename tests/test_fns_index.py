@@ -2,7 +2,6 @@ from pathlib import Path
 
 from scheme_b2b.fns_index import FNSIndex
 
-
 def test_fns_index_rebuild_and_lookup(tmp_path: Path):
     snapshot = tmp_path / "fns.xml"
     snapshot.write_text(
@@ -17,7 +16,6 @@ def test_fns_index_rebuild_and_lookup(tmp_path: Path):
     assert row is not None
     assert row.ogrn == "1027700132195"
     assert index.is_fresh(48)
-
 
 def test_indexed_verifier_mode(tmp_path):
     from scheme_b2b.fns import FNSVerifier
@@ -44,7 +42,6 @@ def test_indexed_verifier_mode(tmp_path):
     result = FNSVerifier(Settings()).verify("7707083893", "1027700132195")
     assert result.confirmed
 
-
 def test_fns_index_rejects_stale_data(tmp_path: Path):
     snapshot = tmp_path / "fns.xml"
     snapshot.write_text(
@@ -56,7 +53,6 @@ def test_fns_index_rejects_stale_data(tmp_path: Path):
     index = FNSIndex(f"sqlite:///{db}")
     index.rebuild(str(snapshot))
     assert not index.is_fresh(0)
-
 
 def test_fns_index_upserts_duplicate_registry_identifier(tmp_path: Path):
     snapshot = tmp_path / 'fns.xml'
