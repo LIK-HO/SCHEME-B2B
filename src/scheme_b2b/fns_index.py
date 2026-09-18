@@ -6,7 +6,8 @@ from pathlib import Path
 import zipfile
 import xml.etree.ElementTree as ET
 
-from sqlalchemy import DateTime, Integer, String, create_engine, insert
+from sqlalchemy import DateTime, Integer, String, create_engine
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from .registry import FNSBulkSource
@@ -109,14 +110,14 @@ class FNSIndex:
                             "verified_at": indexed_at,
                         }
                     )
-                    count += 1
-
                     if len(batch) >= 1000:
-                        session.execute(insert(FNSIndexRow), batch)
+                        self._upsert_batch(session, batch)
                         batch.clear()
 
                 if batch:
-                    session.execute(insert(FNSIndexRow), batch)
+                    self._upsert_batch(session, batch)
+
+                count = session.query(FNSIndexRow).count()
 
                 session.merge(
                     FNSIndexMeta(
@@ -135,6 +136,21 @@ class FNSIndex:
 
         return count
 
+
+    @staticmethod
+    def _upsert_batch(session, rows: list[dict[str, object]]) -> None:
+        statement = sqlite_insert(FNSIndexRow).values(rows)
+        statement = statement.on_conflict_do_update(
+            index_elements=[FNSIndexRow.registry_id],
+            set_={
+                "inn": statement.excluded.inn,
+                "ogrn": statement.excluded.ogrn,
+                "ogrnip": statement.excluded.ogrnip,
+                "company": statement.excluded.company,
+                "verified_at": statement.excluded.verified_at,
+            },
+        )
+        session.execute(statement)
 
 def _sha256(path: Path, chunk_size: int = 1024 * 1024) -> str:
     digest = hashlib.sha256()
