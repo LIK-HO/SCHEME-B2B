@@ -25,12 +25,17 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
 
-    service = SearchService(settings, AirtableClient(settings))
-    result = (
-        service.run_once(manual=args.manual)
-        if args.command == "run-once"
-        else service.dispatch_outbox()
-    )
+    if args.command == "build-fns-index":
+        from .fns_index import FNSIndex
+
+        result = {"indexed": FNSIndex(settings.fns_index_db_url).rebuild(args.path)}
+    else:
+        service = SearchService(settings, AirtableClient(settings))
+        result = (
+            service.run_once(manual=args.manual)
+            if args.command == "run-once"
+            else service.dispatch_outbox()
+        )
 
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 
