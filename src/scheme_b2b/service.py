@@ -56,7 +56,7 @@ class SearchService:
             session.commit()
 
         try:
-            candidates: list = []
+            candidates = []
             source_errors: list[str] = []
             for source in self.sources:
                 try:
@@ -79,10 +79,6 @@ class SearchService:
                 try:
                     validation = validate_requisites(candidate.inn, candidate.ogrn, candidate.ogrnip)
                     inn = validation.inn
-                    if not inn:
-                        counters["rejected"] += 1
-                        rejected_reasons[validation.reason] = rejected_reasons.get(validation.reason, 0) + 1
-                        continue
 
                     if not validation.valid:
                         counters["rejected"] += 1
@@ -113,6 +109,7 @@ class SearchService:
                         f"Автооценка: {score}/100",
                         f"ФНС: {fns.status}",
                     ]
+
                     self.airtable.create_record(
                         self.settings.airtable_table_companies,
                         {
@@ -150,14 +147,24 @@ class SearchService:
             )
             self._update_run_log(run_id, "success", counters, summary)
 
-            if profile:
-                self._mark_profile_run(profile, counters)
+            profile_name = (
+                str(profile.get("fields", {}).get("Профиль поиска") or self.settings.search_profile_name)
+                if profile
+                else self.settings.search_profile_name
+            )
 
-            profile_name = str(profile.get("fields", {}).get("Профиль поиска") or self.settings.search_profile_name) if profile else self.settings.search_profile_name
-            if self.settings.max_enabled and self.settings.max_recipient_id:
-                self.outbox.enqueue(f"{run_id}:summary", CHANNEL_MAX, profile_name, summary)
-            if self.settings.email_enabled and self.settings.email_to:
-                self.outbox.enqueue(f"{run_id}:summary", CHANNEL_EMAIL, profile_name, summary)
+            if profile:
+                self._mark_profile_run(profile)
+
+            channels = self._notification_channels(profile)
+            for channel, recipient in channels:
+                self.outbox.enqueue(
+                    f"{run_id}:summary:{channel}",
+                    channel,
+                    profile_name,
+                    summary,
+                    recipient,
+                )
 
             return {"status": "success", "run_id": run_id, **counters, "summary": summary}
 
@@ -168,6 +175,22 @@ class SearchService:
 
     def dispatch_outbox(self) -> dict[str, int]:
         return self.outbox.dispatch()
+
+    def _notification_channels(self, profile: dict | None) -> list[tuple[str, str]]:
+        fields = profile.get("fields", {}) if profile else {}
+        channels: list[tuple[str, str]] = []
+
+        email_enabled = bool(fields.get("Email уведомления")) if profile else self.settings.email_enabled
+        email_to = str(fields.get("Email получатель") or self.settings.email_to)
+        if email_enabled and email_to:
+            channels.append((CHANNEL_EMAIL, email_to))
+
+        max_enabled = bool(fields.get("MAX уведомления")) if profile else self.settings.max_enabled
+        max_recipient = str(fields.get("MAX получатель (ID)") or self.settings.max_recipient_id)
+        if max_enabled and max_recipient:
+            channels.append((CHANNEL_MAX, max_recipient))
+
+        return channels
 
     def _profile_allows_run(self, profile: dict) -> bool:
         fields = profile.get("fields", {})
@@ -182,9 +205,12 @@ class SearchService:
         last_run = fields.get("Последний запуск")
         return not already_ran_this_slot(str(last_run) if last_run else None, now)
 
-    def _mark_profile_run(self, profile: dict, counters: dict[str, int]) -> None:
+    def _mark_profile_run(self, profile: dict) -> None:
         now = datetime.now(MSK)
-        upcoming = next_run(str(profile.get("fields", {}).get("Частота поиска") or "1 раз в день"), now)
+        upcoming = next_run(
+            str(profile.get("fields", {}).get("Частота поиска") or "1 раз в день"),
+            now,
+        )
         self.airtable.update_record(
             self.settings.airtable_table_search,
             profile["id"],
