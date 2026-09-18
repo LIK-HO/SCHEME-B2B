@@ -130,6 +130,7 @@ class AirtableClient:
         )
         records = payload.get("records", [])
         return records[0] if records else None
+
     def list_pending_notifications(self, table_id: str) -> list[dict[str, Any]]:
         formula = 'OR({Статус}="Ожидает",{Статус}="Ошибка")'
         records: list[dict[str, Any]] = []
@@ -160,8 +161,8 @@ class AirtableClient:
         event_id: str,
         channel: str,
     ) -> dict[str, Any] | None:
-        event = event_id.replace("\\", "\\\\").replace('"', '\"')
-        chan = channel.replace("\\", "\\\\").replace('"', '\"')
+        event = event_id.replace("\\", "\\\\").replace('"', '\\\"')
+        chan = channel.replace("\\", "\\\\").replace('"', '\\\"')
         formula = f'AND({{Идентификатор события}}="{event}",{{Канал}}="{chan}")'
         payload = self._request(
             "GET",
