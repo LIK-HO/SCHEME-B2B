@@ -19,6 +19,7 @@ class FakeAirtable:
     def __init__(self):
         self.keys = set()
         self.created = []
+        self.raise_after_create = False
 
     def get_search_profile(self, settings):
         return None
@@ -32,6 +33,8 @@ class FakeAirtable:
     def create_record(self, table_id, fields):
         self.created.append((table_id, fields))
         self.keys.add(fields["ИНН"])
+        if self.raise_after_create:
+            raise RuntimeError("ambiguous timeout")
         return {"id": "recTEST"}
 
     def update_record(self, table_id, record_id, fields):
@@ -82,3 +85,24 @@ def test_run_once_fails_closed_without_sources(tmp_path: Path):
 
     assert result["status"] == "error"
     assert result["errors"] == 1
+
+
+def test_run_once_reconciles_ambiguous_airtable_create(tmp_path: Path):
+    airtable = FakeAirtable()
+    airtable.raise_after_create = True
+    candidate = Candidate(
+        company="ООО Ромашка",
+        inn="7707083893",
+        ogrn="1027700132195",
+        sector="Логистика",
+    )
+    service = SearchService(
+        _settings(tmp_path),
+        airtable,
+        sources=[FakeSource([candidate])],
+    )
+
+    result = service.run_once(manual=True)
+
+    assert result["status"] == "success"
+    assert result["inserted"] == 1
