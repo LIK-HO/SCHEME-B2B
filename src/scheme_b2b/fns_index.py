@@ -52,17 +52,17 @@ class FNSIndex:
 
     def get(self, inn: str, ogrn: str = "", ogrnip: str = "") -> FNSIndexRow | None:
         registry_id = ogrn or ogrnip
-        if not registry_id:
-            return None
         with self.sessions() as session:
-            row = session.get(FNSIndexRow, registry_id)
-            if row is None or row.inn != inn:
-                return None
-            if ogrn and row.ogrn != ogrn:
-                return None
-            if ogrnip and row.ogrnip != ogrnip:
-                return None
-            return row
+            if registry_id:
+                row = session.get(FNSIndexRow, registry_id)
+                if row is None or row.inn != inn:
+                    return None
+                if ogrn and row.ogrn != ogrn:
+                    return None
+                if ogrnip and row.ogrnip != ogrnip:
+                    return None
+                return row
+            return session.query(FNSIndexRow).filter_by(inn=inn).first()
 
     def metadata(self) -> FNSIndexMeta | None:
         with self.sessions() as session:
@@ -89,6 +89,7 @@ class FNSIndex:
             raise ValueError("ДатаВыг отсутствует в snapshot ФНС")
         indexed_at = now_utc()
         count = 0
+        parsed_valid = 0
         batch: list[dict[str, object]] = []
 
         with self.sessions() as session:
@@ -100,6 +101,7 @@ class FNSIndex:
                     if not validation.valid:
                         continue
 
+                    parsed_valid += 1
                     batch.append(
                         {
                             "registry_id": validation.ogrn or validation.ogrnip,
@@ -118,6 +120,8 @@ class FNSIndex:
                     self._upsert_batch(session, batch)
 
                 count = session.query(FNSIndexRow).count()
+                if parsed_valid == 0:
+                    raise ValueError("snapshot ФНС не содержит валидных регистрационных записей")
 
                 session.merge(
                     FNSIndexMeta(
@@ -136,7 +140,6 @@ class FNSIndex:
 
         return count
 
-
     @staticmethod
     def _upsert_batch(session, rows: list[dict[str, object]]) -> None:
         statement = sqlite_insert(FNSIndexRow).values(rows)
@@ -151,6 +154,7 @@ class FNSIndex:
             },
         )
         session.execute(statement)
+
 
 def _sha256(path: Path, chunk_size: int = 1024 * 1024) -> str:
     digest = hashlib.sha256()

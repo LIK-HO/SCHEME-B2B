@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from .classification import classify_okved, is_moscow_label
 from .normalization import normalize_name

@@ -2,6 +2,7 @@ from pathlib import Path
 
 from scheme_b2b.fns_index import FNSIndex
 
+
 def test_fns_index_rebuild_and_lookup(tmp_path: Path):
     snapshot = tmp_path / "fns.xml"
     snapshot.write_text(
@@ -16,6 +17,7 @@ def test_fns_index_rebuild_and_lookup(tmp_path: Path):
     assert row is not None
     assert row.ogrn == "1027700132195"
     assert index.is_fresh(48)
+
 
 def test_indexed_verifier_mode(tmp_path):
     from scheme_b2b.fns import FNSVerifier
@@ -42,6 +44,7 @@ def test_indexed_verifier_mode(tmp_path):
     result = FNSVerifier(Settings()).verify("7707083893", "1027700132195")
     assert result.confirmed
 
+
 def test_fns_index_rejects_stale_data(tmp_path: Path):
     snapshot = tmp_path / "fns.xml"
     snapshot.write_text(
@@ -54,16 +57,29 @@ def test_fns_index_rejects_stale_data(tmp_path: Path):
     index.rebuild(str(snapshot))
     assert not index.is_fresh(0)
 
+
 def test_fns_index_upserts_duplicate_registry_identifier(tmp_path: Path):
-    snapshot = tmp_path / 'fns.xml'
+    snapshot = tmp_path / "fns.xml"
     snapshot.write_text(
         '<EGRUL ДатаВыг="2026-09-18">'
         '<СвЮЛ ИНН="7707083893" ОГРН="1027700132195" ПолнНаимОПФ="СТАРОЕ" КодРегион="77"/>'
         '<СвЮЛ ИНН="7707083893" ОГРН="1027700132195" ПолнНаимОПФ="НОВОЕ" КодРегион="77"/>'
-        '</EGRUL>',
-        encoding='utf-8',
+        "</EGRUL>",
+        encoding="utf-8",
     )
-    db = tmp_path / 'index.sqlite3'
-    index = FNSIndex(f'sqlite:///{db}')
+    db = tmp_path / "index.sqlite3"
+    index = FNSIndex(f"sqlite:///{db}")
     assert index.rebuild(str(snapshot)) == 1
-    assert index.get('7707083893', '1027700132195').company == 'НОВОЕ'
+    assert index.get("7707083893", "1027700132195").company == "НОВОЕ"
+
+
+def test_fns_index_rejects_empty_snapshot(tmp_path: Path):
+    snapshot = tmp_path / "empty.xml"
+    snapshot.write_text('<EGRUL ДатаВыг="2026-09-18"></EGRUL>', encoding="utf-8")
+    db = tmp_path / "index.sqlite3"
+    index = FNSIndex(f"sqlite:///{db}")
+
+    import pytest
+
+    with pytest.raises(ValueError, match="не содержит валидных"):
+        index.rebuild(str(snapshot))

@@ -31,11 +31,7 @@ def main() -> None:
         result = {"indexed": FNSIndex(settings.fns_index_db_url).rebuild(args.path)}
     else:
         service = SearchService(settings, AirtableClient(settings))
-        result = (
-            service.run_once(manual=args.manual)
-            if args.command == "run-once"
-            else service.dispatch_outbox()
-        )
+        result = service.run_once(manual=args.manual) if args.command == "run-once" else service.dispatch_outbox()
 
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 

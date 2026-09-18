@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 import zipfile
 import xml.etree.ElementTree as ET
 
@@ -123,9 +123,7 @@ def candidate_from_registry_element(root: ET.Element, source: str) -> Candidate 
         company = ""
 
     code = _okved(root)
-    city = "Москва" if is_moscow(root) else _walk_text(
-        root, {"Город", "НаселенныйПункт", "НаимНаселПункта"}
-    )
+    city = "Москва" if is_moscow(root) else _walk_text(root, {"Город", "НаселенныйПункт", "НаимНаселПункта"})
 
     responsible = _walk_text(
         root,
@@ -139,6 +137,7 @@ def candidate_from_registry_element(root: ET.Element, source: str) -> Candidate 
         ogrnip=ogrnip,
         city=city or "Москва",
         sector=classify_okved(code),
+        responsible=responsible,
         source=source,
         comment=f"Официальная XML-выгрузка; ОКВЭД={code or 'не указан'}",
     )

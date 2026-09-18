@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -39,6 +39,9 @@ jobs:
 
       - name: Package integrity
         run: python -m pip check
+
+      - name: Build package
+        run: python -m build --sdist --wheel
 
       - name: Tests
         run: pytest -q

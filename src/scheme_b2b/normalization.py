@@ -54,7 +54,9 @@ def normalize_website(value: str | None) -> str:
         return ""
     if not re.match(r"^https?://", raw, flags=re.IGNORECASE):
         raw = "https://" + raw
+    if any(char.isspace() for char in raw):
+        return ""
     parsed = urlparse(raw)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or not parsed.hostname:
         return ""
     return raw

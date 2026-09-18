@@ -5,10 +5,17 @@ import uuid
 
 from .airtable import AirtableClient
 from .config import Settings
-from .db import create_session_factory
+from .db import (
+    LeaseBusyError,
+    acquire_lease,
+    claim_company_identity,
+    create_session_factory,
+    mark_company_identity_projected,
+    release_lease,
+)
 from .dedup import GlobalDeduplicator
 from .fns import FNSVerifier
-from .models import RunLog
+from .models import RunItem, RunLog
 from .outbox import CHANNEL_EMAIL, CHANNEL_MAX, OutboxDispatcher
 from .schedule import already_ran_this_slot, next_run, should_run_now
 from .scoring import priority
@@ -49,10 +56,23 @@ class SearchService:
             return {"status": "skipped", "reason": "outside_schedule_or_disabled"}
 
         run_id = f"run-{now_msk().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
-        log = RunLog(run_id=run_id, status="started", started_at=now_utc())
-        with self.session_factory() as session:
-            session.add(log)
-            session.commit()
+        try:
+            lease_owner = acquire_lease(
+                self.session_factory,
+                "search-run",
+                self.settings.search_lease_seconds,
+            )
+        except LeaseBusyError:
+            return {"status": "skipped", "reason": "another_search_worker_is_running"}
+
+        try:
+            log = RunLog(run_id=run_id, status="started", started_at=now_utc())
+            with self.session_factory() as session:
+                session.add(log)
+                session.commit()
+        except Exception:
+            release_lease(self.session_factory, "search-run", lease_owner)
+            raise
 
         try:
             counters = {
@@ -81,8 +101,21 @@ class SearchService:
                     source_limits_hit,
                     new_limit_hit,
                 )
+                try:
+                    self._enqueue_summary(profile, run_id, summary)
+                except Exception as exc:
+                    counters["errors"] += 1
+                    source_errors.append(f"Создание уведомления: {exc}")
+                    summary = self._summary_text(
+                        run_id,
+                        counters,
+                        duplicate_locations,
+                        rejected_reasons,
+                        source_errors,
+                        source_limits_hit,
+                        new_limit_hit,
+                    )
                 self._update_run_log(run_id, "error", counters, summary)
-                self._enqueue_summary(profile, run_id, summary)
                 return {"status": "error", "run_id": run_id, **counters, "summary": summary}
 
             try:
@@ -99,8 +132,21 @@ class SearchService:
                     source_limits_hit,
                     new_limit_hit,
                 )
+                try:
+                    self._enqueue_summary(profile, run_id, summary)
+                except Exception as exc:
+                    counters["errors"] += 1
+                    source_errors.append(f"Создание уведомления: {exc}")
+                    summary = self._summary_text(
+                        run_id,
+                        counters,
+                        duplicate_locations,
+                        rejected_reasons,
+                        source_errors,
+                        source_limits_hit,
+                        new_limit_hit,
+                    )
                 self._update_run_log(run_id, "error", counters, summary)
-                self._enqueue_summary(profile, run_id, summary)
                 return {"status": "error", "run_id": run_id, **counters, "summary": summary}
 
             stop_after_new = False
@@ -115,7 +161,9 @@ class SearchService:
                         counters["candidates"] += 1
 
                         self._process_candidate(
+                            run_id,
                             candidate,
+                            source.name,
                             seen_batch,
                             counters,
                             duplicate_locations,
@@ -133,7 +181,9 @@ class SearchService:
                 if stop_after_new:
                     break
 
-            run_status = "partial" if source_errors or source_limits_hit or new_limit_hit or counters["errors"] else "success"
+            run_status = (
+                "partial" if source_errors or source_limits_hit or new_limit_hit or counters["errors"] else "success"
+            )
 
             if profile:
                 try:
@@ -174,19 +224,27 @@ class SearchService:
 
         except Exception as exc:
             summary = f"Запуск {run_id} завершён с ошибкой: {exc}"
-            self._update_run_log(run_id, "error", {"errors": 1}, summary)
+            try:
+                self._update_run_log(run_id, "error", {"errors": 1}, summary)
+            except Exception:
+                logger.exception("Failed to persist error state for run: %s", run_id)
             logger.exception("Search run failed: %s", run_id)
             raise
+        finally:
+            release_lease(self.session_factory, "search-run", lease_owner)
 
     def _process_candidate(
         self,
+        run_id: str,
         candidate: Candidate,
+        source_name: str,
         seen_batch: set[str],
         counters: dict[str, int],
         duplicate_locations: dict[str, list[str]],
         rejected_reasons: dict[str, int],
     ) -> None:
         try:
+            effective_source = candidate.source or source_name
             if not candidate.company:
                 counters["rejected"] += 1
                 rejected_reasons["Название компании отсутствует"] = (
@@ -220,9 +278,9 @@ class SearchService:
                         rejected_reasons.get(f"Проверка ФНС: {fns.message}", 0) + 1
                     )
                     return
+                seen_batch.add(inn)
                 counters["rejected"] += 1
                 rejected_reasons[fns.message] = rejected_reasons.get(fns.message, 0) + 1
-                seen_batch.add(inn)
                 return
 
             seen_batch.add(inn)
@@ -246,7 +304,7 @@ class SearchService:
                 "Сайт": candidate.website,
                 "Ответственный": candidate.responsible,
                 "Статус": "Ожидает",
-                "Источник": candidate.source,
+                "Источник": effective_source,
                 "Приоритет": level,
                 "Дата обнаружения": now_msk().date().isoformat(),
                 "Дата проверки": now_msk().date().isoformat(),
@@ -256,11 +314,25 @@ class SearchService:
                 "Источник проверки ФНС": fns.source_url,
                 "Результат проверки ФНС": fns.message,
             }
+            claimed, identity = claim_company_identity(
+                self.session_factory,
+                inn,
+                run_id,
+                effective_source,
+            )
+            if not claimed and identity.status != "projection_pending":
+                counters["duplicates"] += 1
+                duplicate_locations.setdefault(inn, []).append("core identity")
+                return
+
+            airtable_record_id = ""
+            outcome = "created"
             try:
-                self.airtable.create_record(
+                result = self.airtable.create_record(
                     self.settings.airtable_table_companies,
                     company_fields,
                 )
+                airtable_record_id = str(result.get("id") or "") if isinstance(result, dict) else ""
             except Exception as exc:
                 try:
                     if not self.airtable.exists_by_inn(
@@ -268,6 +340,7 @@ class SearchService:
                         inn,
                     ):
                         raise exc
+                    outcome = "reconciled"
                     logger.warning(
                         "Airtable create outcome ambiguous; record already exists for INN %s",
                         inn,
@@ -275,14 +348,57 @@ class SearchService:
                 except Exception:
                     raise
 
+            mark_company_identity_projected(
+                self.session_factory,
+                inn,
+                airtable_record_id,
+            )
+            self._record_run_item(
+                run_id,
+                inn,
+                effective_source,
+                outcome,
+                airtable_record_id,
+            )
             counters["inserted"] += 1
 
         except Exception:
             counters["errors"] += 1
             logger.exception("Ошибка обработки кандидата %s", candidate.company)
 
+    def _record_run_item(
+        self,
+        run_id: str,
+        inn: str,
+        source: str,
+        outcome: str,
+        airtable_record_id: str,
+    ) -> None:
+        with self.session_factory() as session:
+            session.add(
+                RunItem(
+                    run_id=run_id,
+                    inn=inn,
+                    source=effective_source,
+                    outcome=outcome,
+                    airtable_record_id=airtable_record_id,
+                )
+            )
+            session.commit()
+
     def dispatch_outbox(self) -> dict[str, int]:
-        return self.outbox.dispatch()
+        try:
+            lease_owner = acquire_lease(
+                self.session_factory,
+                "outbox-dispatch",
+                self.settings.outbox_lease_seconds,
+            )
+        except LeaseBusyError:
+            return {"sent": 0, "failed": 0, "skipped": 0, "locked": 1}
+        try:
+            return self.outbox.dispatch()
+        finally:
+            release_lease(self.session_factory, "outbox-dispatch", lease_owner)
 
     def _notification_channels(self, profile: dict | None) -> list[tuple[str, str]]:
         fields = profile.get("fields", {}) if profile else {}

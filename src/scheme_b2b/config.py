@@ -59,7 +59,8 @@ class Settings(BaseSettings):
     fns_index_db_url: str = Field(default="sqlite:///data/fns_index.sqlite3")
     fns_index_max_age_hours: float = Field(default=48, gt=0)
 
-    outbox_lease_seconds: int = Field(default=600, gt=0)
+    search_lease_seconds: int = Field(default=7200, gt=0)
+    outbox_lease_seconds: int = Field(default=900, gt=0)
     outbox_jitter_ratio: float = Field(default=0.2, ge=0, le=1)
 
     max_candidates_per_source: int = Field(default=2000, gt=0)

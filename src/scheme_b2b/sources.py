@@ -1,7 +1,9 @@
 import json
 from dataclasses import dataclass
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -94,6 +96,28 @@ class JsonUrlSource(CandidateSource):
         if not isinstance(items, list):
             raise ValueError("SOURCE_JSON_URL должен возвращать массив или объект с companies[]")
         return [candidate_from_mapping(x, self.name) for x in items if isinstance(x, dict)]
+
+
+def source_configuration_errors(settings: Settings) -> list[str]:
+    errors: list[str] = []
+    if settings.source_json_file and not Path(settings.source_json_file).is_file():
+        errors.append(f"SOURCE_JSON_FILE not found: {settings.source_json_file}")
+    if settings.source_json_url:
+        parsed = urlparse(settings.source_json_url)
+        if parsed.scheme != "https" or not parsed.netloc:
+            errors.append("SOURCE_JSON_URL must be a valid HTTPS URL")
+    if settings.fns_rsmp_path and not Path(settings.fns_rsmp_path).is_file():
+        errors.append(f"FNS_RSMP_PATH not found: {settings.fns_rsmp_path}")
+    if settings.rosstat_registry_path and not Path(settings.rosstat_registry_path).is_file():
+        errors.append(f"ROSSTAT_REGISTRY_PATH not found: {settings.rosstat_registry_path}")
+    if not (
+        settings.source_json_file
+        or settings.source_json_url
+        or settings.fns_rsmp_path
+        or settings.rosstat_registry_path
+    ):
+        errors.append("SEARCH_SOURCE is not configured")
+    return errors
 
 
 def build_sources(settings: Settings) -> list[CandidateSource]:

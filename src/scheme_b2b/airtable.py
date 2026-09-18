@@ -137,9 +137,7 @@ class AirtableClient:
         )
 
     def get_search_profile(self, settings: Settings) -> dict[str, Any] | None:
-        escaped = (
-            settings.search_profile_name.replace("\\", "\\\\").replace('"', '\\"')
-        )
+        escaped = settings.search_profile_name.replace("\\", "\\\\").replace('"', '\\"')
         formula = f'{{Профиль поиска}}="{escaped}"'
         payload = self._request(
             "GET",
@@ -181,8 +179,8 @@ class AirtableClient:
         event_id: str,
         channel: str,
     ) -> dict[str, Any] | None:
-        event = event_id.replace("\\", "\\\\").replace('"', '\\\"')
-        chan = channel.replace("\\", "\\\\").replace('"', '\\\"')
+        event = event_id.replace("\\", "\\\\").replace('"', '\\"')
+        chan = channel.replace("\\", "\\\\").replace('"', '\\"')
         formula = f'AND({{Идентификатор события}}="{event}",{{Канал}}="{chan}")'
         payload = self._request(
             "GET",

@@ -1,9 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 
 MSK = ZoneInfo("Europe/Moscow")
-UTC = timezone.utc
 
 
 def now_utc() -> datetime:

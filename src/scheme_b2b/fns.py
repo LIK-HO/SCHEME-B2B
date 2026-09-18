@@ -32,6 +32,54 @@ class FNSVerifier:
     ) -> RequisitesValidation:
         return validate_requisites(inn, ogrn, ogrnip)
 
+    def readiness_error(self) -> str | None:
+        """Return a blocking configuration/data-freshness error for /ready."""
+        if not self.settings.require_fns_confirmation:
+            return None
+
+        mode = self.settings.fns_mode.lower()
+        if mode == "checksum":
+            return "FNS_OFFICIAL_VERIFICATION"
+        if mode == "official":
+            if not self.settings.fns_verify_url:
+                return "FNS_VERIFY_URL"
+            if not self.settings.fns_verify_url.lower().startswith("https://"):
+                return "FNS_VERIFY_URL_MUST_USE_HTTPS"
+            return None
+        if mode == "bulk":
+            if not self.settings.fns_egrul_bulk_path:
+                return "FNS_EGRUL_BULK_PATH"
+            path = Path(self.settings.fns_egrul_bulk_path)
+            if not path.is_file():
+                return "FNS_EGRUL_BULK_PATH_NOT_FOUND"
+            try:
+                source_date = self._snapshot_date_for_readiness(path)
+            except Exception:
+                return "FNS_SNAPSHOT_UNREADABLE"
+            if source_date is None:
+                return "FNS_SNAPSHOT_DATE"
+            current = ensure_aware(now_utc(), tz=MSK)
+            age = current - ensure_aware(source_date, tz=MSK)
+            if age < timedelta(0) or age > timedelta(hours=self.settings.fns_index_max_age_hours):
+                return "FNS_SNAPSHOT_FRESHNESS"
+            return None
+        if mode == "bulk-index":
+            try:
+                from .fns_index import FNSIndex
+
+                if not FNSIndex(self.settings.fns_index_db_url).is_fresh(self.settings.fns_index_max_age_hours):
+                    return "FNS_INDEX_FRESHNESS"
+            except Exception:
+                return "FNS_INDEX"
+            return None
+        return "FNS_MODE"
+
+    @staticmethod
+    def _snapshot_date_for_readiness(path: Path):
+        from .fns_index import _snapshot_date
+
+        return _snapshot_date(path)
+
     def verify(self, inn: str, ogrn: str = "", ogrnip: str = "") -> FNSResult:
         local = self.validate_format(inn, ogrn, ogrnip)
         if not local.valid:
@@ -169,14 +217,8 @@ class FNSVerifier:
 
         found = bool(data.get("found"))
         same_inn = str(data.get("inn", "")) == local.inn
-        same_ogrn = (
-            not local.ogrn
-            or normalize_ogrn(str(data.get("ogrn", ""))) == local.ogrn
-        )
-        same_ogrnip = (
-            not local.ogrnip
-            or normalize_ogrnip(str(data.get("ogrnip", ""))) == local.ogrnip
-        )
+        same_ogrn = not local.ogrn or normalize_ogrn(str(data.get("ogrn", ""))) == local.ogrn
+        same_ogrnip = not local.ogrnip or normalize_ogrnip(str(data.get("ogrnip", ""))) == local.ogrnip
         confirmed = found and same_inn and same_ogrn and same_ogrnip
 
         message = (
