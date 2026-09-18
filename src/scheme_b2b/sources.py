@@ -95,7 +95,13 @@ def build_sources(settings: Settings) -> list[CandidateSource]:
     if settings.fns_rsmp_path:
         from .registry import FNSBulkSource
 
-        sources.append(FNSBulkSource(settings.fns_rsmp_path, only_moscow=True))
+        sources.append(
+            FNSBulkSource(
+                settings.fns_rsmp_path,
+                only_moscow=True,
+                source_name="ФНС — Единый реестр МСП",
+            )
+        )
 
     if settings.rosstat_registry_path:
         from .opendata import OpenDataCsvSource
