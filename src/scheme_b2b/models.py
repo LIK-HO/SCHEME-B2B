@@ -25,14 +25,3 @@ class RunLog(Base):
     errors: Mapped[int] = mapped_column(Integer, default=0)
     details: Mapped[str] = mapped_column(Text, default="")
 
-
-class LocalOutboxEvent(Base):
-    __tablename__ = "local_outbox_event"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    event_id: Mapped[str] = mapped_column(String(160), unique=True, index=True)
-    channel: Mapped[str] = mapped_column(String(30))
-    status: Mapped[str] = mapped_column(String(30), default="pending")
-    attempts: Mapped[int] = mapped_column(Integer, default=0)
-    last_error: Mapped[str] = mapped_column(Text, default="")
-    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
