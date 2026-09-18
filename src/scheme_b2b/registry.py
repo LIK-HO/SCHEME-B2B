@@ -156,6 +156,7 @@ def candidate_from_registry_element(root: ET.Element, source: str) -> Candidate 
 class FNSBulkSource:
     path: str
     only_moscow: bool = True
+    source_name: str = "ФНС — ЕГРЮЛ/ЕГРИП"
 
     def iter_candidates(self) -> Iterator[Candidate]:
         source_path = Path(self.path)
@@ -185,7 +186,7 @@ class FNSBulkSource:
         context = ET.iterparse(xml_path, events=("end",))
         for _, element in context:
             if local_name(element.tag) in {"СвЮЛ", "СвИП"}:
-                candidate = candidate_from_registry_element(element, "ФНС — ЕГРЮЛ/ЕГРИП")
+                candidate = candidate_from_registry_element(element, self.source_name)
                 if candidate and (not self.only_moscow or is_moscow(element)):
                     yield candidate
                 element.clear()
