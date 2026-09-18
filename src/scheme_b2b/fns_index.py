@@ -145,23 +145,29 @@ def _sha256(path: Path, chunk_size: int = 1024 * 1024) -> str:
 
 
 def _snapshot_date(path: Path) -> datetime | None:
+    def read_date(handle) -> datetime | None:
+        for _, element in ET.iterparse(handle, events=("start",)):
+            raw = element.attrib.get("ДатаВыг", "").strip()
+            if not raw:
+                return None
+            try:
+                return datetime.combine(
+                    date.fromisoformat(raw),
+                    datetime.min.time(),
+                    tzinfo=MSK,
+                )
+            except ValueError:
+                return None
+        return None
+
     if path.suffix.lower() == ".zip":
         with zipfile.ZipFile(path) as archive:
             for info in archive.infolist():
                 if info.is_dir() or not info.filename.lower().endswith(".xml"):
                     continue
                 with archive.open(info) as handle:
-                    root = ET.parse(handle).getroot()
-                    break
-            else:
-                return None
-    else:
-        root = ET.parse(path).getroot()
+                    return read_date(handle)
+        return None
 
-    raw = root.attrib.get("ДатаВыг", "").strip()
-    if not raw:
-        return None
-    try:
-        return datetime.combine(date.fromisoformat(raw), datetime.min.time(), tzinfo=MSK)
-    except ValueError:
-        return None
+    with path.open("rb") as handle:
+        return read_date(handle)
