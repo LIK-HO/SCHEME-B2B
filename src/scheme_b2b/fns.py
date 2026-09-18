@@ -35,6 +35,9 @@ class FNSVerifier:
             return FNSResult("Не подтверждена", False, local.reason)
 
         mode = self.settings.fns_mode.lower()
+        if mode == "bulk-index":
+            return self._verify_index(local)
+
         if mode == "bulk":
             return self._verify_bulk(local)
 
@@ -46,6 +49,35 @@ class FNSVerifier:
             )
 
         return self._verify_http(local)
+
+    def _verify_index(self, local: RequisitesValidation) -> FNSResult:
+        try:
+            from .fns_index import FNSIndex
+
+            row = FNSIndex(self.settings.fns_index_db_url).get(local.inn)
+        except Exception as exc:
+            return FNSResult("Ошибка", False, f"Ошибка доступа к индексу ФНС: {exc}")
+
+        if row is None:
+            return FNSResult(
+                "Не подтверждена",
+                False,
+                "Совпадающая запись не найдена в индексе официальной выгрузки ФНС.",
+                "https://www.nalog.gov.ru/rn77/service/egrip2/",
+            )
+
+        ogrn_ok = not local.ogrn or row.ogrn == local.ogrn
+        ogrnip_ok = not local.ogrnip or row.ogrnip == local.ogrnip
+        confirmed = ogrn_ok and ogrnip_ok
+
+        return FNSResult(
+            "Подтверждена" if confirmed else "Не подтверждена",
+            confirmed,
+            "Реквизиты совпали в индексе официальной выгрузки ФНС."
+            if confirmed
+            else "ИНН найден, но ОГРН/ОГРНИП не совпал.",
+            "https://www.nalog.gov.ru/rn77/service/egrip2/",
+        )
 
     def _verify_bulk(self, local: RequisitesValidation) -> FNSResult:
         path = self.settings.fns_egrul_bulk_path
