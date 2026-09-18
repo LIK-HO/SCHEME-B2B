@@ -57,7 +57,7 @@ class OutboxDispatcher:
 
     def dispatch(self) -> dict[str, int]:
         table = self.settings.airtable_table_notifications
-        records = self.airtable.list_records(table, page_size=100)
+        records = self.airtable.list_pending_notifications(table)
         stats = {"sent": 0, "failed": 0, "skipped": 0}
         now = datetime.now(MSK)
 
