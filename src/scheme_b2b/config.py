@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     outbox_backoff_base_seconds: int = 10
 
     local_db_url: str = Field(default="sqlite:///data/scheme_b2b.sqlite3")
+    fns_index_db_url: str = Field(default="sqlite:///data/fns_index.sqlite3")
 
     @property
     def local_db_path(self) -> Path | None:
