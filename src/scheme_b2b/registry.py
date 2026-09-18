@@ -181,7 +181,7 @@ class FNSBulkSource:
     def _parse_xml(self, xml_path: Path) -> Iterator[Candidate]:
         context = ET.iterparse(xml_path, events=("end",))
         for _, element in context:
-            if local_name(element.tag) in {"СвЮЛ", "СвИП"}:
+            if local_name(element.tag) in RECORD_TAGS:
                 candidate = candidate_from_registry_element(element, self.source_name)
                 if candidate and (not self.only_moscow or is_moscow(element)):
                     yield candidate
