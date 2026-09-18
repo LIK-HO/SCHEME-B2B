@@ -41,6 +41,17 @@ def test_bulk_source_reads_xml(tmp_path: Path):
     assert len(candidates) == 1
     assert candidates[0].inn == "7707083893"
 
+def test_bulk_source_reads_generic_record_variant(tmp_path: Path):
+    path = tmp_path / "sample.xml"
+    path.write_text(
+        '<ROOT><Запись ИНН="7707083893" ОГРН="1027700132195" '
+        'НаимЮЛПолн="ООО РОМАШКА" КодРегион="77"/></ROOT>',
+        encoding="utf-8",
+    )
+    candidates = FNSBulkSource(str(path)).load()
+    assert len(candidates) == 1
+    assert candidates[0].inn == "7707083893"
+
 
 def test_bulk_fns_verifier_confirms_exact_match(tmp_path: Path):
     path = tmp_path / "sample.xml"
