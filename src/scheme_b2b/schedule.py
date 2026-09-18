@@ -6,13 +6,16 @@ MSK = ZoneInfo("Europe/Moscow")
 SLOT_HOURS = (6, 14, 22)
 
 
+FREQUENCY_SLOTS = {
+    "1 раз в день": (6,),
+    "2 раза в день": (6, 14),
+    "3 раза в день": SLOT_HOURS,
+}
+
+
 def allowed_slots(frequency: str) -> tuple[int, ...]:
     value = (frequency or "").strip().lower()
-    if value.startswith("1"):
-        return (6,)
-    if value.startswith("2"):
-        return (6, 14)
-    return SLOT_HOURS
+    return FREQUENCY_SLOTS.get(value, ())
 
 
 def should_run_now(frequency: str, now: datetime | None = None) -> bool:
@@ -23,6 +26,8 @@ def should_run_now(frequency: str, now: datetime | None = None) -> bool:
 def next_run(frequency: str, now: datetime | None = None) -> datetime:
     current = now or datetime.now(MSK)
     slots = allowed_slots(frequency)
+    if not slots:
+        return current.replace(hour=6, minute=7, second=0, microsecond=0) + timedelta(days=1)
     for hour in slots:
         candidate = current.replace(hour=hour, minute=7, second=0, microsecond=0)
         if candidate > current:
