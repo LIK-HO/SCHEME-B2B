@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: scheme-b2b-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
