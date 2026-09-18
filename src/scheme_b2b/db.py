@@ -6,7 +6,7 @@ from .models import Base
 
 
 def create_session_factory(settings: Settings):
-    connect_args = {"check_same_thread": False} if settings.local_db_url.startswith("sqlite") else {}
+    connect_args = ({"check_same_thread": False, "timeout": 30} if settings.local_db_url.startswith("sqlite") else {})
     engine = create_engine(
         settings.local_db_url,
         future=True,
