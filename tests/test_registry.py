@@ -82,3 +82,24 @@ def test_bulk_source_reads_zip_stream(tmp_path: Path):
     assert len(candidates) == 1
     assert candidates[0].inn == "7707083893"
 
+
+
+def test_bulk_fns_verifier_rejects_missing_snapshot_date(tmp_path: Path):
+    path = tmp_path / 'sample.xml'
+    path.write_text(
+        '<EGRUL><СвЮЛ ИНН="7707083893" ОГРН="1027700132195" '
+        'ПолнНаимОПФ="ООО РОМАШКА" КодРегион="77"/></EGRUL>',
+        encoding='utf-8',
+    )
+
+    class Settings:
+        fns_mode = 'bulk'
+        fns_egrul_bulk_path = str(path)
+        fns_verify_url = ''
+        fns_verify_token = ''
+        source_timeout_seconds = 5
+        fns_index_max_age_hours = 48
+
+    result = FNSVerifier(Settings()).verify('7707083893', '1027700132195')
+    assert not result.confirmed
+    assert 'ДатаВыг' in result.message
