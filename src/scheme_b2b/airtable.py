@@ -35,10 +35,10 @@ class AirtableClient:
             self._last_request_at = time.monotonic()
             try:
                 response = httpx.request(
-                method,
-                url,
-                headers=self.headers,
-                timeout=self.timeout,
+                    method,
+                    url,
+                    headers=self.headers,
+                    timeout=self.timeout,
                     **kwargs,
                 )
             except httpx.RequestError as exc:
