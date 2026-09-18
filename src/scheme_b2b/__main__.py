@@ -24,10 +24,11 @@ def main() -> None:
     )
 
     service = SearchService(settings, AirtableClient(settings))
-    if args.command == "run-once":
-        result = service.run_once(manual=args.manual)
-    else:
-        result = service.dispatch_outbox()
+    result = (
+        service.run_once(manual=args.manual)
+        if args.command == "run-once"
+        else service.dispatch_outbox()
+    )
 
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 
