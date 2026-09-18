@@ -22,3 +22,6 @@ def test_idempotent_slot():
 def test_next_run():
     now = datetime(2026, 9, 18, 6, 7, tzinfo=MSK)
     assert next_run("2 раза в день", now).hour == 14
+
+def test_invalid_frequency_fails_closed():
+    assert allowed_slots("invalid") == ()
