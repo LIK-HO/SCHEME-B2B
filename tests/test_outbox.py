@@ -1,7 +1,7 @@
-from scheme_b2b.outbox import CHANNEL_EMAIL, OutboxDispatcher
+from scheme_b2b.outbox import OutboxDispatcher
 
 
-def test_unknown_channel_fails_fast(monkeypatch):
+def test_unknown_channel_fails_fast():
     class FakeSettings:
         outbox_max_attempts = 5
         outbox_backoff_base_seconds = 10
