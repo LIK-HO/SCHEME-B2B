@@ -1,4 +1,5 @@
 from pathlib import Path
+import zipfile
 import xml.etree.ElementTree as ET
 
 from scheme_b2b.fns import FNSVerifier
@@ -59,3 +60,18 @@ def test_bulk_fns_verifier_confirms_exact_match(tmp_path: Path):
     result = FNSVerifier(Settings()).verify("7707083893", "1027700132195")
     assert result.confirmed
     assert result.status == "Подтверждена"
+
+def test_bulk_source_reads_zip_stream(tmp_path: Path):
+    path = tmp_path / "sample.zip"
+    xml = (
+        '<?xml version="1.0" encoding="windows-1251"?>'
+        '<EGRUL><СвЮЛ ИНН="7707083893" ОГРН="1027700132195" '
+        'ПолнНаимОПФ="ООО РОМАШКА" КодРегион="77"/></EGRUL>'
+    ).encode("cp1251")
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("EGRUL_FULL_2026-01-01.xml", xml)
+
+    candidates = FNSBulkSource(str(path)).load()
+    assert len(candidates) == 1
+    assert candidates[0].inn == "7707083893"
+
