@@ -27,6 +27,12 @@ def is_moscow_label(value: str | None) -> bool:
     text = " ".join((value or "").strip().lower().split())
     if not text:
         return False
-    if text in {"77", "г. москва", "город москва", "москва", "москва г"}:
-        return True
-    return "москв" in text and "област" not in text
+    return text in {
+        "77",
+        "москва",
+        "г москва",
+        "г. москва",
+        "город москва",
+        "москва г",
+        "город федерального значения москва",
+    }
