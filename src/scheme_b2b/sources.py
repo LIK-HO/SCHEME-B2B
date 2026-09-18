@@ -6,7 +6,14 @@ from typing import Any
 import httpx
 
 from .config import Settings
-from .normalization import normalize_email, normalize_name, normalize_phone
+from .normalization import (
+    is_valid_email,
+    is_valid_phone,
+    normalize_email,
+    normalize_name,
+    normalize_phone,
+    normalize_website,
+)
 
 
 @dataclass(frozen=True)
@@ -42,9 +49,9 @@ def candidate_from_mapping(item: dict[str, Any], source_name: str = "") -> Candi
         city=normalize_name(str(item.get("city") or item.get("Город") or "Москва")),
         sector=normalize_name(str(item.get("sector") or item.get("Сфера") or "Другое")) or "Другое",
         need=normalize_name(str(item.get("need") or item.get("Потребность") or "")),
-        phone=normalize_phone(str(item.get("phone") or item.get("Телефон") or "")),
-        email=normalize_email(str(item.get("email") or item.get("Почта") or "")),
-        website=str(item.get("website") or item.get("Сайт") or "").strip(),
+        phone=(phone if is_valid_phone(phone) else ""),
+        email=(email if is_valid_email(email) else ""),
+        website=normalize_website(str(item.get("website") or item.get("Сайт") or "")),
         responsible=normalize_name(str(item.get("responsible") or item.get("Ответственный") or "")),
         source=normalize_name(str(item.get("source") or item.get("Источник") or source_name)),
         comment=normalize_name(str(item.get("comment") or item.get("Комментарий") or "")),
