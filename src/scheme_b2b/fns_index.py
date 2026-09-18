@@ -6,7 +6,7 @@ from pathlib import Path
 import zipfile
 import xml.etree.ElementTree as ET
 
-from sqlalchemy import DateTime, Integer, String, create_engine
+from sqlalchemy import DateTime, Integer, String, create_engine, insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from .registry import FNSBulkSource
@@ -88,6 +88,7 @@ class FNSIndex:
             raise ValueError("ДатаВыг отсутствует в snapshot ФНС")
         indexed_at = now_utc()
         count = 0
+        batch: list[dict[str, object]] = []
 
         with self.sessions() as session:
             try:
@@ -98,21 +99,24 @@ class FNSIndex:
                     if not validation.valid:
                         continue
 
-                    registry_id = validation.ogrn or validation.ogrnip
-                    row = FNSIndexRow(
-                        registry_id=registry_id,
-                        inn=validation.inn,
-                        ogrn=validation.ogrn,
-                        ogrnip=validation.ogrnip,
-                        company=candidate.company,
-                        verified_at=indexed_at,
+                    batch.append(
+                        {
+                            "registry_id": validation.ogrn or validation.ogrnip,
+                            "inn": validation.inn,
+                            "ogrn": validation.ogrn,
+                            "ogrnip": validation.ogrnip,
+                            "company": candidate.company,
+                            "verified_at": indexed_at,
+                        }
                     )
-                    session.merge(row)
                     count += 1
 
-                    if count % 1000 == 0:
-                        session.flush()
-                        session.expunge_all()
+                    if len(batch) >= 1000:
+                        session.execute(insert(FNSIndexRow), batch)
+                        batch.clear()
+
+                if batch:
+                    session.execute(insert(FNSIndexRow), batch)
 
                 session.merge(
                     FNSIndexMeta(
