@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from .classification import classify_okved, is_moscow_label
 from .normalization import normalize_name
@@ -58,7 +58,7 @@ class OpenDataCsvSource:
         self.name = source_name
         self.only_moscow = only_moscow
 
-    def load(self) -> list[Candidate]:
+    def iter_candidates(self) -> Iterator[Candidate]:
         if not self.path.exists():
             raise FileNotFoundError(self.path)
 
@@ -67,15 +67,17 @@ class OpenDataCsvSource:
             try:
                 with self.path.open("r", encoding=encoding, newline="") as handle:
                     reader = csv.DictReader(handle)
-                    result = []
                     for row in reader:
                         candidate = candidate_from_csv_row(row, self.name)
                         if not candidate.inn:
                             continue
                         if self.only_moscow and not is_moscow_label(candidate.city):
                             continue
-                        result.append(candidate)
-                    return result
+                        yield candidate
+                    return
             except UnicodeDecodeError as exc:
                 last_error = exc
         raise ValueError(f"Не удалось прочитать CSV: {last_error}")
+
+    def load(self) -> list[Candidate]:
+        return list(self.iter_candidates())
