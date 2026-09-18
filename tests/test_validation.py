@@ -22,3 +22,18 @@ def test_bad_checksum_is_rejected():
 def test_requisites_require_inn_and_entity_identifier():
     result = validate_requisites("7707083893", "1027700132195", "")
     assert result.valid
+
+
+def test_requisites_enforce_legal_entity_identifier_type():
+    assert validate_requisites("7707083893", "1027700132195", "").valid
+    assert not validate_requisites("7707083893", "", "304500116800070").valid
+
+
+def test_requisites_enforce_ip_identifier_type():
+    assert not validate_requisites("304500116800070", "1027700132195", "").valid
+
+
+def test_requisites_reject_both_registry_identifiers():
+    result = validate_requisites("7707083893", "1027700132195", "304500116800070")
+    assert not result.valid
+    assert "Одновременно" in result.reason
