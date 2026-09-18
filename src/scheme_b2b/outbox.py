@@ -22,12 +22,18 @@ class OutboxDispatcher:
         self.airtable = airtable
         self.settings = settings
 
-    def enqueue(self, event_id: str, channel: str, profile: str, summary: str) -> bool:
+    def enqueue(
+        self,
+        event_id: str,
+        channel: str,
+        profile: str,
+        summary: str,
+        recipient: str,
+    ) -> bool:
         table = self.settings.airtable_table_notifications
         if self.airtable.find_notification(table, event_id, channel):
             return False
 
-        recipient = self.settings.email_to if channel == CHANNEL_EMAIL else self.settings.max_recipient_id
         self.airtable.create_record(
             table,
             {
@@ -52,8 +58,8 @@ class OutboxDispatcher:
         table = self.settings.airtable_table_notifications
         records = self.airtable.list_records(table, page_size=100)
         stats = {"sent": 0, "failed": 0, "skipped": 0}
-
         now = datetime.now(MSK)
+
         for record in records:
             fields = record.get("fields", {})
             status = str(fields.get("Статус") or STATUS_PENDING)
@@ -91,6 +97,7 @@ class OutboxDispatcher:
                 )
 
                 external_id = self._deliver(channel, recipient, message, subject)
+
                 self.airtable.update_record(
                     table,
                     record_id,
@@ -130,21 +137,18 @@ class OutboxDispatcher:
         raise ValueError(f"Неизвестный канал уведомления: {channel}")
 
     def _send_max(self, recipient: str, message: str) -> str:
-        if not self.settings.max_enabled:
-            raise RuntimeError("MAX канал отключён")
         if not self.settings.max_bot_token:
             raise RuntimeError("MAX бот не настроен")
         if not recipient:
             raise RuntimeError("MAX получатель не задан")
-        if len(message) > 4000:
-            message = message[:3990] + "\n[сообщение сокращено]"
 
+        message = message if len(message) <= 4000 else message[:3990] + "\n[сообщение сокращено]"
         target = recipient.strip()
+
         if target.startswith("chat:"):
             params = {"chat_id": int(target.removeprefix("chat:"))}
         else:
-            user_id = target.removeprefix("user:")
-            params = {"user_id": int(user_id)}
+            params = {"user_id": int(target.removeprefix("user:"))}
 
         response = httpx.post(
             f"{self.settings.max_api_base.rstrip('/')}/messages",
@@ -159,8 +163,6 @@ class OutboxDispatcher:
         return str(message_obj.get("id") or "")
 
     def _send_email(self, recipient: str, message: str, subject: str) -> None:
-        if not self.settings.email_enabled:
-            raise RuntimeError("Email канал отключён")
         if not recipient:
             raise RuntimeError("Email получатель не задан")
         if not self.settings.smtp_host or not self.settings.smtp_from:
