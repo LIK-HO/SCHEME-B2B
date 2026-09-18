@@ -130,7 +130,7 @@ class AirtableClient:
         )
         records = payload.get("records", [])
         return records[0] if records else None
-
+,    def list_pending_notifications(self, table_id: str) -> list[dict[str, Any]]:,        formula = 'OR({Статус}="Ожидает",{Статус}="Ошибка")',        records: list[dict[str, Any]] = [],        offset: str | None = None,        while True:,            params: dict[str, Any] = {"pageSize": 100, "filterByFormula": formula},            if offset:,                params["offset"] = offset,            payload = self._request("GET", table_id, params=params),            records.extend(payload.get("records", [])),            offset = payload.get("offset"),            if not offset:,                return records
     def list_inn_keys(self, table_id: str) -> set[str]:
         records = self.list_records(table_id, fields=["Ключ ИНН", "ИНН"], page_size=100)
         keys: set[str] = set()
