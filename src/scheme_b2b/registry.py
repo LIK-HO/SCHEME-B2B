@@ -178,13 +178,8 @@ class FNSBulkSource:
             for info in archive.infolist():
                 if info.is_dir() or not info.filename.lower().endswith(".xml"):
                     continue
-                data = archive.read(info)
-                temp_path = source_path.with_name(f".{source_path.stem}.{info.CRC}.xml.tmp")
-                temp_path.write_bytes(data)
-                try:
-                    yield temp_path
-                finally:
-                    temp_path.unlink(missing_ok=True)
+                with archive.open(info) as handle:
+                    yield from self._parse_stream(handle)
 
     def _parse_xml(self, xml_path: Path) -> Iterator[Candidate]:
         context = ET.iterparse(xml_path, events=("end",))
