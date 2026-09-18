@@ -11,7 +11,9 @@ app = FastAPI(title=settings.app_name, version="0.1.0")
 
 
 def _authorize(x_api_key: str | None) -> None:
-    if settings.api_key and x_api_key != settings.api_key:
+    if not settings.api_key:
+        raise HTTPException(status_code=503, detail="API_KEY is not configured")
+    if x_api_key != settings.api_key:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
@@ -26,8 +28,13 @@ def health() -> dict[str, str]:
 
 @app.get("/ready")
 def ready() -> dict[str, str]:
+    missing = []
     if not settings.airtable_token:
-        raise HTTPException(status_code=503, detail="AIRTABLE_TOKEN is not configured")
+        missing.append("AIRTABLE_TOKEN")
+    if not settings.api_key:
+        missing.append("API_KEY")
+    if missing:
+        raise HTTPException(status_code=503, detail=f"Not ready: missing {', '.join(missing)}")
     return {"status": "ready"}
 
 
