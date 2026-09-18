@@ -15,6 +15,8 @@ def main() -> None:
     run.add_argument("--manual", action="store_true")
 
     sub.add_parser("dispatch-outbox")
+    index = sub.add_parser("build-fns-index")
+    index.add_argument("--path", required=True)
 
     args = parser.parse_args()
     settings = get_settings()
