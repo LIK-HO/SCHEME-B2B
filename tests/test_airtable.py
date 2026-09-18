@@ -42,3 +42,16 @@ def test_airtable_profile_must_be_unique(monkeypatch):
         assert "не уникален" in str(exc)
     else:
         raise AssertionError("Expected duplicate search profile to fail")
+
+
+def test_airtable_exists_by_inn_normalizes_value(monkeypatch):
+    client = AirtableClient(FakeSettings())
+    captured = {}
+
+    def fake_request(*args, **kwargs):
+        captured["params"] = kwargs["params"]
+        return {"records": []}
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    assert not client.exists_by_inn("tbltest", "7 707 083 893")
+    assert captured["params"]["filterByFormula"] == '{Ключ ИНН}="7707083893"'
