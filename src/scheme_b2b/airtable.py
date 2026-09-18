@@ -22,18 +22,33 @@ class AirtableClient:
         self.headers = {"Authorization": f"Bearer {settings.airtable_token}"}
         self.timeout = settings.airtable_timeout_seconds
         self.max_retries = 3
+        self.min_request_interval = 0.21
+        self._last_request_at = 0.0
 
     def _request(self, method: str, table_id: str, **kwargs: Any) -> dict[str, Any]:
         url = f"{self.base_url}/{table_id}"
         last_error = ""
         for attempt in range(self.max_retries + 1):
-            response = httpx.request(
+            elapsed = time.monotonic() - self._last_request_at
+            if elapsed < self.min_request_interval:
+                time.sleep(self.min_request_interval - elapsed)
+            self._last_request_at = time.monotonic()
+            try:
+                response = httpx.request(
                 method,
                 url,
                 headers=self.headers,
                 timeout=self.timeout,
-                **kwargs,
-            )
+                    **kwargs,
+                )
+            except httpx.RequestError as exc:
+                last_error = str(exc)[:500]
+                if attempt >= self.max_retries:
+                    raise AirtableError(f"Airtable network error: {last_error}") from exc
+                base_delay = 2.0**attempt
+                time.sleep(max(0.1, base_delay * random.uniform(0.8, 1.2)))
+                continue
+
             if response.status_code < 400:
                 return response.json()
 
