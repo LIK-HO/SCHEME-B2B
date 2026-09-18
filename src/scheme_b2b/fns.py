@@ -5,6 +5,7 @@ import httpx
 
 from .config import Settings
 from .normalization import normalize_ogrn, normalize_ogrnip
+from .time_utils import now_utc
 from .registry import FNSBulkSource
 from .validation import RequisitesValidation, validate_requisites
 
@@ -43,9 +44,9 @@ class FNSVerifier:
 
         if mode != "official":
             return FNSResult(
-                "Формат подтверждён",
+                "Формат валиден",
                 False,
-                "Реквизиты прошли контрольные суммы; официальный запрос ФНС не настроен.",
+                "Реквизиты прошли контрольные суммы; актуальная проверка ФНС не настроена.",
             )
 
         return self._verify_http(local)
@@ -54,7 +55,10 @@ class FNSVerifier:
         try:
             from .fns_index import FNSIndex
 
-            row = FNSIndex(self.settings.fns_index_db_url).get(local.inn)
+            index = FNSIndex(self.settings.fns_index_db_url)
+            if not index.is_fresh(self.settings.fns_index_max_age_hours, now_utc()):
+                return FNSResult("Не подтверждена", False, "Индекс ФНС отсутствует или устарел; актуальный snapshot не подтверждён.", "https://www.nalog.gov.ru/rn77/service/egrip2/")
+            row = index.get(local.inn, local.ogrn, local.ogrnip)
         except Exception as exc:
             return FNSResult("Ошибка", False, f"Ошибка доступа к индексу ФНС: {exc}")
 
@@ -62,13 +66,11 @@ class FNSVerifier:
             return FNSResult(
                 "Не подтверждена",
                 False,
-                "Совпадающая запись не найдена в индексе официальной выгрузки ФНС.",
+                "Совпадающая запись с теми же ИНН и ОГРН/ОГРНИП не найдена в индексе ФНС.",
                 "https://www.nalog.gov.ru/rn77/service/egrip2/",
             )
 
-        ogrn_ok = not local.ogrn or row.ogrn == local.ogrn
-        ogrnip_ok = not local.ogrnip or row.ogrnip == local.ogrnip
-        confirmed = ogrn_ok and ogrnip_ok
+        confirmed = True
 
         return FNSResult(
             "Подтверждена" if confirmed else "Не подтверждена",
