@@ -71,6 +71,7 @@ class SearchService:
 
             if not self.sources:
                 source_errors.append("Источники поиска не настроены")
+                counters["errors"] = 1
                 summary = self._summary_text(
                     run_id,
                     counters,
@@ -80,11 +81,8 @@ class SearchService:
                     source_limits_hit,
                     new_limit_hit,
                 )
-                counters["errors"] = 1
                 self._update_run_log(run_id, "error", counters, summary)
                 self._enqueue_summary(profile, run_id, summary)
-                if profile:
-                    self._mark_profile_run(profile)
                 return {"status": "error", "run_id": run_id, **counters, "summary": summary}
 
             try:
@@ -103,8 +101,6 @@ class SearchService:
                 )
                 self._update_run_log(run_id, "error", counters, summary)
                 self._enqueue_summary(profile, run_id, summary)
-                if profile:
-                    self._mark_profile_run(profile)
                 return {"status": "error", "run_id": run_id, **counters, "summary": summary}
 
             stop_after_new = False
@@ -146,7 +142,7 @@ class SearchService:
                 source_limits_hit,
                 new_limit_hit,
             )
-            run_status = "partial" if source_errors or source_limits_hit or new_limit_hit else "success"
+            run_status = "partial" if source_errors or source_limits_hit or new_limit_hit or counters["errors"] else "success"
             self._update_run_log(run_id, run_status, counters, summary)
 
             if profile:
