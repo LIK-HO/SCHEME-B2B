@@ -4,6 +4,7 @@ import csv
 from pathlib import Path
 from typing import Any
 
+from .classification import classify_okved, is_moscow_label
 from .normalization import normalize_name
 from .sources import Candidate
 
@@ -41,7 +42,7 @@ def candidate_from_csv_row(row: dict[str, Any], source_name: str) -> Candidate:
         ogrn=_value(data, FIELD_NAMES["ogrn"]),
         ogrnip=_value(data, FIELD_NAMES["ogrnip"]),
         city=_value(data, FIELD_NAMES["city"]) or "Москва",
-        sector="Услуги B2B",
+        sector=classify_okved(_value(data, FIELD_NAMES["okved"])),
         need="",
         phone=_value(data, FIELD_NAMES["phone"]),
         email=_value(data, FIELD_NAMES["email"]),
@@ -71,11 +72,7 @@ class OpenDataCsvSource:
                         candidate = candidate_from_csv_row(row, self.name)
                         if not candidate.inn:
                             continue
-                        if self.only_moscow and candidate.city.lower() not in {
-                            "москва",
-                            "г. москва",
-                            "город москва",
-                        }:
+                        if self.only_moscow and not is_moscow_label(candidate.city):
                             continue
                         result.append(candidate)
                     return result
