@@ -19,14 +19,15 @@ permissions:
 
 jobs:
   search:
+    if: ${{ vars.SCHEME_B2B_SEARCH_ENABLED == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       AIRTABLE_BASE_ID: "appI8LyuBMv5z468N"
-      AIRTABLE_TOKEN: \${{ secrets.AIRTABLE_TOKEN }}
-      MAX_BOT_TOKEN: \${{ secrets.MAX_BOT_TOKEN }}
-      FNS_VERIFY_TOKEN: \${{ secrets.FNS_VERIFY_TOKEN }}
-      SMTP_PASSWORD: \${{ secrets.SMTP_PASSWORD }}
+      AIRTABLE_TOKEN: ${{ secrets.AIRTABLE_TOKEN }}
+      MAX_BOT_TOKEN: ${{ secrets.MAX_BOT_TOKEN }}
+      FNS_VERIFY_TOKEN: ${{ secrets.FNS_VERIFY_TOKEN }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
