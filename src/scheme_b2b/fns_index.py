@@ -182,7 +182,9 @@ def _snapshot_date(path: Path) -> datetime | None:
                 if info.is_dir() or not info.filename.lower().endswith(".xml"):
                     continue
                 with archive.open(info) as handle:
-                    return read_date(handle)
+                    source_date = read_date(handle)
+                if source_date is not None:
+                    return source_date
         return None
 
     with path.open("rb") as handle:
