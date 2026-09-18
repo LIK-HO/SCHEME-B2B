@@ -59,6 +59,7 @@ python -m pip install -e ".[dev]"
 pytest -q
 python -m scheme_b2b run-once
 python -m scheme_b2b dispatch-outbox
+python -m scheme_b2b build-fns-index --path /data/fns/egrul.zip
 uvicorn scheme_b2b.main:app --host 0.0.0.0 --port 8080
 ~~~
 
@@ -84,6 +85,14 @@ GitHub Actions запускает worker три раза в сутки:
 - 22:07 Москва
 
 Сам worker читает частоту из 10 Поиск. Поэтому три scheduled invocations не означают три фактических поиска для профиля 1 раз в день.
+
+## Официальные snapshots
+
+Большие официальные XML/ZIP выгрузки не кладутся в Git. Для постоянного режима храните их на машине с persistent storage, затем выполняйте:
+
+    python -m scheme_b2b build-fns-index --path /data/fns/egrul.zip
+
+После построения FNS_MODE=bulk-index позволяет проверять реквизиты через локальный индекс без повторного полного сканирования реестра.
 
 ## Ограничения первого промышленного контура
 
