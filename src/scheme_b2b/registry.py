@@ -7,6 +7,8 @@ from typing import Iterator
 import zipfile
 import xml.etree.ElementTree as ET
 
+from .classification import classify_okved as _classify_okved
+from .classification import is_moscow_label
 from .normalization import normalize_name, normalize_ogrn, normalize_ogrnip, normalize_inn
 from .sources import Candidate
 
@@ -66,25 +68,12 @@ def _okved(root: ET.Element) -> str:
 
 
 def classify_okved(code: str) -> str:
-    prefix = (code or "").strip()
-    families = (
-        ("Логистика", ("49.", "50.", "51.", "52.1", "52.2", "52.24", "52.29")),
-        ("Склады", ("52.10", "52.21", "52.22", "52.23", "52.24")),
-        ("Производство", tuple(f"{n:02d}." for n in range(10, 34))),
-        ("Строительство", ("41.", "42.", "43.")),
-        ("Ритейл", ("45.", "46.", "47.")),
-        ("Мероприятия", ("90.", "93.2")),
-        ("Офисы", ("68.", "69.", "70.", "71.", "73.", "74.")),
-    )
-    for sector, prefixes in families:
-        if prefix.startswith(prefixes):
-            return sector
-    return "Услуги B2B"
+    return _classify_okved(code)
 
 
 def is_moscow(root: ET.Element) -> bool:
     region = _walk_attr(root, ("КодРегион", "КодРегиона", "КодСубъекта"))
-    if region == "77":
+    if is_moscow_label(region):
         return True
     text = " ".join(
         _clean(value)
@@ -93,8 +82,8 @@ def is_moscow(root: ET.Element) -> bool:
             _walk_text(root, {"Регион", "НаимРегион", "НаимРегионКрат"}),
         )
         if value
-    ).lower()
-    return "москв" in text
+    )
+    return is_moscow_label(text)
 
 
 def candidate_from_registry_element(root: ET.Element, source: str) -> Candidate | None:
@@ -181,6 +170,15 @@ class FNSBulkSource:
                     continue
                 with archive.open(info) as handle:
                     yield from self._parse_stream(handle)
+
+    def _parse_stream(self, handle) -> Iterator[Candidate]:
+        context = ET.iterparse(handle, events=("end",))
+        for _, element in context:
+            if local_name(element.tag) in {"СвЮЛ", "СвИП"}:
+                candidate = candidate_from_registry_element(element, self.source_name)
+                if candidate and (not self.only_moscow or is_moscow(element)):
+                    yield candidate
+                element.clear()
 
     def _parse_xml(self, xml_path: Path) -> Iterator[Candidate]:
         context = ET.iterparse(xml_path, events=("end",))
