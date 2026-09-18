@@ -379,7 +379,7 @@ class SearchService:
                 RunItem(
                     run_id=run_id,
                     inn=inn,
-                    source=effective_source,
+                    source=source,
                     outcome=outcome,
                     airtable_record_id=airtable_record_id,
                 )
