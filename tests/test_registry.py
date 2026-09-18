@@ -31,7 +31,8 @@ def test_rsmp_record_variant_is_accepted():
 def test_bulk_source_reads_xml(tmp_path: Path):
     path = tmp_path / "sample.xml"
     path.write_text(
-        '<EGRUL ДатаВыг="2026-09-18"><СвЮЛ ИНН="7707083893" ОГРН="1027700132195" ПолнНаимОПФ="ООО РОМАШКА" КодРегион="77"/></EGRUL>',
+        '<EGRUL ДатаВыг="2026-09-18"><СвЮЛ ИНН="7707083893" ОГРН="1027700132195" '
+        'ПолнНаимОПФ="ООО РОМАШКА" КодРегион="77"/></EGRUL>',
         encoding="utf-8",
     )
     candidates = FNSBulkSource(str(path)).load()
