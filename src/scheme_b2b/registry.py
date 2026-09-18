@@ -152,16 +152,8 @@ class FNSBulkSource:
         if not source_path.exists():
             raise FileNotFoundError(source_path)
 
-        for xml_path in self._xml_members(source_path):
-            if xml_path is not None:
-                yield from self._parse_xml(xml_path)
-
-    def load(self) -> list[Candidate]:
-        return list(self.iter_candidates())
-
-    def _xml_members(self, source_path: Path) -> Iterator[Path | None]:
         if source_path.suffix.lower() != ".zip":
-            yield source_path
+            yield from self._parse_xml(source_path)
             return
 
         with zipfile.ZipFile(source_path) as archive:
@@ -170,6 +162,9 @@ class FNSBulkSource:
                     continue
                 with archive.open(info) as handle:
                     yield from self._parse_stream(handle)
+
+    def load(self) -> list[Candidate]:
+        return list(self.iter_candidates())
 
     def _parse_stream(self, handle) -> Iterator[Candidate]:
         context = ET.iterparse(handle, events=("end",))
