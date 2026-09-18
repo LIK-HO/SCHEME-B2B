@@ -56,3 +56,18 @@ def test_fns_index_rejects_stale_data(tmp_path: Path):
     index = FNSIndex(f"sqlite:///{db}")
     index.rebuild(str(snapshot))
     assert not index.is_fresh(0)
+
+
+def test_fns_index_upserts_duplicate_registry_identifier(tmp_path: Path):
+    snapshot = tmp_path / 'fns.xml'
+    snapshot.write_text(
+        '<EGRUL ДатаВыг="2026-09-18">'
+        '<СвЮЛ ИНН="7707083893" ОГРН="1027700132195" ПолнНаимОПФ="СТАРОЕ" КодРегион="77"/>'
+        '<СвЮЛ ИНН="7707083893" ОГРН="1027700132195" ПолнНаимОПФ="НОВОЕ" КодРегион="77"/>'
+        '</EGRUL>',
+        encoding='utf-8',
+    )
+    db = tmp_path / 'index.sqlite3'
+    index = FNSIndex(f'sqlite:///{db}')
+    assert index.rebuild(str(snapshot)) == 1
+    assert index.get('7707083893', '1027700132195').company == 'НОВОЕ'
