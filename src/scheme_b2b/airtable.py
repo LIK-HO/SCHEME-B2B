@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 import time
 from typing import Any
 
@@ -42,10 +43,10 @@ class AirtableClient:
 
             retry_after = response.headers.get("Retry-After")
             try:
-                delay = min(float(retry_after), 30.0) if retry_after else 2.0**attempt
+                base_delay = min(float(retry_after), 30.0) if retry_after else 2.0**attempt
             except ValueError:
-                delay = 2.0**attempt
-            time.sleep(delay)
+                base_delay = 2.0**attempt
+            time.sleep(max(0.1, base_delay * random.uniform(0.8, 1.2)))
 
         raise AirtableError(last_error or "Airtable request failed")
 
@@ -126,9 +127,11 @@ class AirtableClient:
         payload = self._request(
             "GET",
             settings.airtable_table_search,
-            params={"pageSize": 1, "maxRecords": 1, "filterByFormula": formula},
+            params={"pageSize": 2, "maxRecords": 2, "filterByFormula": formula},
         )
         records = payload.get("records", [])
+        if len(records) > 1:
+            raise AirtableError(f"Профиль поиска '{settings.search_profile_name}' не уникален")
         return records[0] if records else None
 
     def list_pending_notifications(self, table_id: str) -> list[dict[str, Any]]:
