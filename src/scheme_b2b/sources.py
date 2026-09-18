@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import httpx
 
@@ -35,6 +35,9 @@ class Candidate:
 
 class CandidateSource:
     name: str
+
+    def iter_candidates(self) -> Iterator[Candidate]:
+        yield from self.load()
 
     def load(self) -> list[Candidate]:
         raise NotImplementedError
