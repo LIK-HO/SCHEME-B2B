@@ -99,9 +99,12 @@ class SearchService:
                     rejected_reasons,
                     source_errors,
                     source_limits_hit,
+                    new_limit_hit,
                 )
                 self._update_run_log(run_id, "error", counters, summary)
                 self._enqueue_summary(profile, run_id, summary)
+                if profile:
+                    self._mark_profile_run(profile)
                 return {"status": "error", "run_id": run_id, **counters, "summary": summary}
 
             stop_after_new = False
