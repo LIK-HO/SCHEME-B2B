@@ -43,7 +43,7 @@ class AirtableClient:
 
         raise AirtableError(last_error or "Airtable request failed")
 
-    def list_records(self, table_id: str, fields: list[str] | None = None, page_size: int = 100) -> list[dict[str, Any]]:
+    def list_records(\n        self, table_id: str, fields: list[str] | None = None, page_size: int = 100\n    ) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
         offset: str | None = None
         while True:
