@@ -120,7 +120,7 @@ def candidate_from_registry_element(root: ET.Element, source: str) -> Candidate 
     )
     company = company or _walk_attr(root, ("НаимЮЛПолн", "НаимСокр", "ФИО"))
     if not company:
-        company = "Без наименования"
+        company = ""
 
     code = _okved(root)
     city = "Москва" if is_moscow(root) else _walk_text(
