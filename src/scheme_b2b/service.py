@@ -12,6 +12,7 @@ from .fns import FNSVerifier
 from .models import RunLog
 from .outbox import CHANNEL_EMAIL, CHANNEL_MAX, OutboxDispatcher
 from .schedule import MSK, already_ran_this_slot, next_run, should_run_now
+from .time_utils import now_msk, now_utc
 from .scoring import priority
 from .sources import CandidateSource, build_sources
 from .validation import validate_requisites
@@ -49,7 +50,7 @@ class SearchService:
             return {"status": "skipped", "reason": "outside_schedule_or_disabled"}
 
         run_id = f"run-{datetime.now(MSK).strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
-        log = RunLog(run_id=run_id, status="started", started_at=datetime.utcnow())
+        log = RunLog(run_id=run_id, status="started", started_at=now_utc())
 
         with self.session_factory() as session:
             session.add(log)
@@ -58,6 +59,8 @@ class SearchService:
         try:
             candidates = []
             source_errors: list[str] = []
+            if not self.sources:
+                source_errors.append("Источники поиска не настроены")
             for source in self.sources:
                 try:
                     candidates.extend(source.load())
@@ -71,6 +74,22 @@ class SearchService:
                 "rejected": 0,
                 "errors": len(source_errors),
             }
+            if source_errors and not candidates:
+                summary = self._summary_text(
+                    run_id,
+                    {"candidates": 0, "inserted": 0, "duplicates": 0, "rejected": 0, "errors": len(source_errors)},
+                    {},
+                    {},
+                    source_errors,
+                )
+                self._update_run_log(
+                    run_id,
+                    "error",
+                    {"candidates": 0, "inserted": 0, "duplicates": 0, "rejected": 0, "errors": len(source_errors)},
+                    summary,
+                )
+                return {"status": "error", "run_id": run_id, "summary": summary, "errors": len(source_errors)}
+
             duplicate_locations: dict[str, list[str]] = {}
             rejected_reasons: dict[str, int] = {}
             seen_batch: set[str] = set()
@@ -145,7 +164,8 @@ class SearchService:
             summary = self._summary_text(
                 run_id, counters, duplicate_locations, rejected_reasons, source_errors
             )
-            self._update_run_log(run_id, "success", counters, summary)
+            run_status = "partial" if source_errors else "success"
+            self._update_run_log(run_id, run_status, counters, summary)
 
             profile_name = (
                 str(profile.get("fields", {}).get("Профиль поиска") or self.settings.search_profile_name)
@@ -166,7 +186,7 @@ class SearchService:
                     recipient,
                 )
 
-            return {"status": "success", "run_id": run_id, **counters, "summary": summary}
+            return {"status": run_status, "run_id": run_id, **counters, "summary": summary}
 
         except Exception as exc:
             summary = f"Запуск {run_id} завершён с ошибкой: {exc}"
@@ -198,7 +218,7 @@ class SearchService:
             return False
 
         frequency = str(fields.get("Частота поиска") or "1 раз в день")
-        now = datetime.now(MSK)
+        now = now_msk()
         if not should_run_now(frequency, now):
             return False
 
@@ -224,7 +244,7 @@ class SearchService:
         with self.session_factory() as session:
             log = session.query(RunLog).filter_by(run_id=run_id).one()
             log.status = status
-            log.finished_at = datetime.utcnow()
+            log.finished_at = now_utc()
             for key in ("candidates", "inserted", "duplicates", "rejected", "errors"):
                 if key in counters:
                     setattr(log, key, counters[key])
