@@ -131,6 +131,15 @@ class AirtableClient:
         records = payload.get("records", [])
         return records[0] if records else None
 
+    def list_inn_keys(self, table_id: str) -> set[str]:
+        records = self.list_records(table_id, fields=["Ключ ИНН", "ИНН"], page_size=100)
+        keys: set[str] = set()
+        for record in records:
+            fields = record.get("fields", {})
+            key = str(fields.get("Ключ ИНН") or fields.get("ИНН") or "").strip()
+            if key:
+                keys.add(key)
+        return keys
     def find_notification(
         self,
         table_id: str,
