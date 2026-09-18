@@ -13,7 +13,7 @@ from .schedule import MSK
 CHANNEL_EMAIL = "Email"
 CHANNEL_MAX = "MAX"
 STATUS_PENDING = "Ожидает"
-STATUS_SENDING = "Отправляется"
+STATUS_SENDING = STATUS_PENDING
 STATUS_SENT = "Отправлено"
 STATUS_ERROR = "Ошибка"
 
