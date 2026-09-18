@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -6,7 +8,7 @@ import httpx
 from .config import Settings
 from .normalization import normalize_ogrn, normalize_ogrnip
 from .registry import FNSBulkSource
-from .time_utils import now_utc
+from .time_utils import MSK, ensure_aware, now_utc
 from .validation import RequisitesValidation, validate_requisites
 
 
@@ -92,6 +94,25 @@ class FNSVerifier:
             return FNSResult("Ошибка", False, "FNS_EGRUL_BULK_PATH не задан")
 
         try:
+            from .fns_index import _snapshot_date
+
+            source_date = _snapshot_date(Path(path))
+            if source_date is None:
+                return FNSResult(
+                    "Не подтверждена",
+                    False,
+                    "Выгрузка ФНС не содержит корректной даты ДатаВыг.",
+                    "https://www.nalog.gov.ru/rn77/service/egrip2/",
+                )
+            age = ensure_aware(now_utc(), tz=MSK) - ensure_aware(source_date, tz=MSK)
+            if age < timedelta(0) or age > timedelta(hours=self.settings.fns_index_max_age_hours):
+                return FNSResult(
+                    "Не подтверждена",
+                    False,
+                    "Указанная выгрузка ФНС устарела; актуальный snapshot не подтверждён.",
+                    "https://www.nalog.gov.ru/rn77/service/egrip2/",
+                )
+
             source = FNSBulkSource(path, only_moscow=False)
             for candidate in source.iter_candidates():
                 if candidate.inn != local.inn:
