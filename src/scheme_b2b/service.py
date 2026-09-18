@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 import logging
 import uuid
 
@@ -11,7 +10,7 @@ from .dedup import GlobalDeduplicator
 from .fns import FNSVerifier
 from .models import RunLog
 from .outbox import CHANNEL_EMAIL, CHANNEL_MAX, OutboxDispatcher
-from .schedule import MSK, already_ran_this_slot, next_run, should_run_now
+from .schedule import already_ran_this_slot, next_run, should_run_now
 from .scoring import priority
 from .sources import Candidate, CandidateSource, build_sources
 from .time_utils import now_msk, now_utc
@@ -68,6 +67,7 @@ class SearchService:
             duplicate_locations: dict[str, list[str]] = {}
             seen_batch: set[str] = set()
             source_limits_hit: list[str] = []
+            new_limit_hit = False
 
             if not self.sources:
                 source_errors.append("Источники поиска не настроены")
@@ -81,7 +81,7 @@ class SearchService:
                 )
                 counters["errors"] = 1
                 self._update_run_log(run_id, "error", counters, summary)
-                self._enqueue_summary(profile, summary)
+                self._enqueue_summary(profile, run_id, summary)
                 if profile:
                     self._mark_profile_run(profile)
                 return {"status": "error", "run_id": run_id, **counters, "summary": summary}
@@ -100,7 +100,7 @@ class SearchService:
                     source_limits_hit,
                 )
                 self._update_run_log(run_id, "error", counters, summary)
-                self._enqueue_summary(profile, summary)
+                self._enqueue_summary(profile, run_id, summary)
                 return {"status": "error", "run_id": run_id, **counters, "summary": summary}
 
             stop_after_new = False
@@ -123,6 +123,7 @@ class SearchService:
                         )
 
                         if counters["inserted"] >= self.settings.max_new_records_per_run:
+                            new_limit_hit = True
                             stop_after_new = True
                             break
                 except Exception as exc:
@@ -139,8 +140,9 @@ class SearchService:
                 rejected_reasons,
                 source_errors,
                 source_limits_hit,
+                new_limit_hit,
             )
-            run_status = "partial" if source_errors or source_limits_hit else "success"
+            run_status = "partial" if source_errors or source_limits_hit or new_limit_hit else "success"
             self._update_run_log(run_id, run_status, counters, summary)
 
             if profile:
@@ -254,12 +256,12 @@ class SearchService:
 
         return channels
 
-    def _enqueue_summary(self, profile: dict | None, summary: str) -> None:
+    def _enqueue_summary(self, profile: dict | None, run_id: str, summary: str) -> None:
         profile_fields = profile.get("fields", {}) if profile else {}
         profile_name = str(profile_fields.get("Профиль поиска") or self.settings.search_profile_name)
         for channel, recipient in self._notification_channels(profile):
             self.outbox.enqueue(
-                f"{summary.splitlines()[0]}:summary:{channel}",
+                f"{run_id}:summary:{channel}",
                 channel,
                 profile_name,
                 summary,
@@ -319,6 +321,7 @@ class SearchService:
         rejected_reasons: dict[str, int],
         source_errors: list[str],
         source_limits_hit: list[str],
+        new_limit_hit: bool,
     ) -> str:
         lines = [
             f"Запуск: {run_id}",
@@ -330,6 +333,8 @@ class SearchService:
         ]
         if source_limits_hit:
             lines.append("Лимит источника достигнут: " + ", ".join(source_limits_hit[:20]))
+        if new_limit_hit:
+            lines.append("Лимит новых компаний за запуск достигнут")
         if duplicate_locations:
             lines.append("Дедуп:")
             for inn, locations in list(duplicate_locations.items())[:20]:
