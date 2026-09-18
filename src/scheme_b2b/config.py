@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     fns_mode: str = "checksum"
     fns_verify_url: str = ""
     fns_verify_token: str = ""
-    require_fns_confirmation: bool = False
+    require_fns_confirmation: bool = True
 
     max_enabled: bool = False
     max_bot_token: str = ""
@@ -57,13 +57,13 @@ class Settings(BaseSettings):
 
     local_db_url: str = Field(default="sqlite:///data/scheme_b2b.sqlite3")
     fns_index_db_url: str = Field(default="sqlite:///data/fns_index.sqlite3")
-    fns_index_max_age_hours: float = 48
+    fns_index_max_age_hours: float = Field(default=48, gt=0)
 
-    outbox_lease_seconds: int = 600
-    outbox_jitter_ratio: float = 0.2
+    outbox_lease_seconds: int = Field(default=600, gt=0)
+    outbox_jitter_ratio: float = Field(default=0.2, ge=0, le=1)
 
-    max_candidates_per_source: int = 2000
-    max_new_records_per_run: int = 100
+    max_candidates_per_source: int = Field(default=2000, gt=0)
+    max_new_records_per_run: int = Field(default=100, gt=0)
 
     @property
     def local_db_path(self) -> Path | None:
