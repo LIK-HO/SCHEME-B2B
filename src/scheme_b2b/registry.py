@@ -13,6 +13,9 @@ from .normalization import normalize_name, normalize_ogrn, normalize_ogrnip, nor
 from .sources import Candidate
 
 
+RECORD_TAGS = {"СвЮЛ", "СвИП", "Запись", "ЗаписьРеестра"}
+
+
 def local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
@@ -169,7 +172,7 @@ class FNSBulkSource:
     def _parse_stream(self, handle) -> Iterator[Candidate]:
         context = ET.iterparse(handle, events=("end",))
         for _, element in context:
-            if local_name(element.tag) in {"СвЮЛ", "СвИП"}:
+            if local_name(element.tag) in RECORD_TAGS:
                 candidate = candidate_from_registry_element(element, self.source_name)
                 if candidate and (not self.only_moscow or is_moscow(element)):
                     yield candidate
