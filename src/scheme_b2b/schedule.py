@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 
@@ -27,8 +27,7 @@ def next_run(frequency: str, now: datetime | None = None) -> datetime:
         candidate = current.replace(hour=hour, minute=7, second=0, microsecond=0)
         if candidate > current:
             return candidate
-    tomorrow = current.replace(hour=slots[0], minute=7, second=0, microsecond=0)
-    return tomorrow.replace(day=tomorrow.day + 1)
+    return current.replace(hour=slots[0], minute=7, second=0, microsecond=0) + timedelta(days=1)
 
 
 def already_ran_this_slot(last_run: str | None, now: datetime | None = None) -> bool:
