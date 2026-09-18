@@ -133,6 +133,16 @@ class SearchService:
                 if stop_after_new:
                     break
 
+            run_status = "partial" if source_errors or source_limits_hit or new_limit_hit or counters["errors"] else "success"
+
+            if profile:
+                try:
+                    self._mark_profile_run(profile)
+                except Exception as exc:
+                    counters["errors"] += 1
+                    source_errors.append(f"Обновление профиля поиска: {exc}")
+                    run_status = "partial"
+
             summary = self._summary_text(
                 run_id,
                 counters,
@@ -142,13 +152,24 @@ class SearchService:
                 source_limits_hit,
                 new_limit_hit,
             )
-            run_status = "partial" if source_errors or source_limits_hit or new_limit_hit or counters["errors"] else "success"
+
+            try:
+                self._enqueue_summary(profile, run_id, summary)
+            except Exception as exc:
+                counters["errors"] += 1
+                source_errors.append(f"Создание уведомления: {exc}")
+                run_status = "partial"
+                summary = self._summary_text(
+                    run_id,
+                    counters,
+                    duplicate_locations,
+                    rejected_reasons,
+                    source_errors,
+                    source_limits_hit,
+                    new_limit_hit,
+                )
+
             self._update_run_log(run_id, run_status, counters, summary)
-
-            if profile:
-                self._mark_profile_run(profile)
-            self._enqueue_summary(profile, run_id, summary)
-
             return {"status": run_status, "run_id": run_id, **counters, "summary": summary}
 
         except Exception as exc:
