@@ -48,3 +48,9 @@ def test_open_data_csv_source_filters_moscow(tmp_path: Path):
     candidates = OpenDataCsvSource(str(path), "Росстат", only_moscow=True).load()
     assert len(candidates) == 1
     assert candidates[0].company == "ООО Ромашка"
+
+def test_warehouse_okved_is_not_misclassified_as_logistics():
+    from scheme_b2b.classification import classify_okved
+
+    assert classify_okved("52.10") == "Склады"
+    assert classify_okved("52.29") == "Логистика"
