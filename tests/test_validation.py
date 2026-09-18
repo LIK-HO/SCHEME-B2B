@@ -30,7 +30,8 @@ def test_requisites_enforce_legal_entity_identifier_type():
 
 
 def test_requisites_enforce_ip_identifier_type():
-    assert not validate_requisites("304500116800070", "1027700132195", "").valid
+    assert validate_requisites("500100000015", "", "304500116800070").valid
+    assert not validate_requisites("500100000015", "1027700132195", "").valid
 
 
 def test_requisites_reject_both_registry_identifiers():
