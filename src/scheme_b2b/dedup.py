@@ -6,6 +6,7 @@ from .normalization import normalize_inn
 
 class DuplicateStore(Protocol):
     def exists_by_inn(self, table_id: str, inn: str) -> bool: ...
+    def list_inn_keys(self, table_id: str) -> set[str]: ...
 
 
 @dataclass(frozen=True)
@@ -36,14 +37,29 @@ class GlobalDeduplicator:
         self.companies_id = companies_id
         self.clients_id = clients_id
         self.archive_id = archive_id
+        self._snapshot: dict[str, set[str]] | None = None
+
+    def prime(self) -> None:
+        self._snapshot = {
+            self.companies_id: self.store.list_inn_keys(self.companies_id),
+            self.clients_id: self.store.list_inn_keys(self.clients_id),
+            self.archive_id: self.store.list_inn_keys(self.archive_id),
+        }
 
     def check(self, inn: str) -> DedupResult:
         key = normalize_inn(inn)
         if not key:
             return DedupResult()
 
+        if self._snapshot is None:
+            return DedupResult(
+                duplicate_in_companies=self.store.exists_by_inn(self.companies_id, key),
+                duplicate_in_clients=self.store.exists_by_inn(self.clients_id, key),
+                duplicate_in_archive=self.store.exists_by_inn(self.archive_id, key),
+            )
+
         return DedupResult(
-            duplicate_in_companies=self.store.exists_by_inn(self.companies_id, key),
-            duplicate_in_clients=self.store.exists_by_inn(self.clients_id, key),
-            duplicate_in_archive=self.store.exists_by_inn(self.archive_id, key),
+            duplicate_in_companies=key in self._snapshot[self.companies_id],
+            duplicate_in_clients=key in self._snapshot[self.clients_id],
+            duplicate_in_archive=key in self._snapshot[self.archive_id],
         )
