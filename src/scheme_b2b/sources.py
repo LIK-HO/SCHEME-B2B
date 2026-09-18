@@ -71,7 +71,7 @@ class JsonFileSource(CandidateSource):
 
     def load(self) -> list[Candidate]:
         if not self.path.exists():
-            return []
+            raise FileNotFoundError(self.path)
         payload = json.loads(self.path.read_text(encoding="utf-8"))
         items = payload.get("companies", payload) if isinstance(payload, dict) else payload
         if not isinstance(items, list):
