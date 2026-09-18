@@ -46,8 +46,8 @@ class RequisitesValidation:
 
     @property
     def valid(self) -> bool:
-        has_legal_entity = bool(self.ogrn) and self.ogrn_valid
-        has_ip = bool(self.ogrnip) and self.ogrnip_valid
+        has_legal_entity = len(self.inn) == 10 and bool(self.ogrn) and self.ogrn_valid and not self.ogrnip
+        has_ip = len(self.inn) == 12 and bool(self.ogrnip) and self.ogrnip_valid and not self.ogrn
         return bool(self.inn) and self.inn_valid and (has_legal_entity or has_ip)
 
     @property
@@ -58,6 +58,12 @@ class RequisitesValidation:
             return "ИНН не прошёл контрольную сумму"
         if not self.ogrn and not self.ogrnip:
             return "Не указан ОГРН или ОГРНИП"
+        if self.ogrn and self.ogrnip:
+            return "Одновременно указаны ОГРН и ОГРНИП"
+        if len(self.inn) == 10 and self.ogrnip:
+            return "Для 10-значного ИНН требуется ОГРН"
+        if len(self.inn) == 12 and self.ogrn:
+            return "Для 12-значного ИНН требуется ОГРНИП"
         if self.ogrn and not self.ogrn_valid:
             return "ОГРН не прошёл контрольную сумму"
         if self.ogrnip and not self.ogrnip_valid:
