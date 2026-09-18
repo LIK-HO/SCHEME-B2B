@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from email.message import EmailMessage
+import random
 import smtplib
 
 import httpx
@@ -85,6 +86,7 @@ class OutboxDispatcher:
 
             try:
                 attempt_time = datetime.now(MSK)
+                lease_until = attempt_time + timedelta(seconds=self.settings.outbox_lease_seconds)
                 self.airtable.update_record(
                     table,
                     record_id,
@@ -92,6 +94,7 @@ class OutboxDispatcher:
                         "Статус": STATUS_SENDING,
                         "Попытки": attempts + 1,
                         "Последняя попытка": attempt_time.isoformat(timespec="seconds"),
+                        "Следующая попытка": lease_until.isoformat(timespec="seconds"),
                         "Ошибка": "",
                     },
                 )
@@ -112,9 +115,9 @@ class OutboxDispatcher:
                 stats["sent"] += 1
 
             except Exception as exc:
-                next_time = datetime.now(MSK) + timedelta(
-                    seconds=self.settings.outbox_backoff_base_seconds * (2**attempts)
-                )
+                base_delay = self.settings.outbox_backoff_base_seconds * (2**attempts)
+                jitter = random.uniform(-self.settings.outbox_jitter_ratio, self.settings.outbox_jitter_ratio)
+                next_time = datetime.now(MSK) + timedelta(seconds=max(1, base_delay * (1 + jitter)))
                 self.airtable.update_record(
                     table,
                     record_id,
