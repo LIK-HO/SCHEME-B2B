@@ -48,7 +48,7 @@ def test_indexed_verifier_mode(tmp_path):
 def test_fns_index_rejects_stale_data(tmp_path: Path):
     snapshot = tmp_path / "fns.xml"
     snapshot.write_text(
-        '<EGRUL><СвЮЛ ИНН="7707083893" ОГРН="1027700132195" '
+        '<EGRUL ДатаВыг="2026-09-18"><СвЮЛ ИНН="7707083893" ОГРН="1027700132195" '
         'ПолнНаимОПФ="ООО РОМАШКА" КодРегион="77"/></EGRUL>',
         encoding="utf-8",
     )
