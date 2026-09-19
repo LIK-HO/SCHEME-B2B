@@ -55,3 +55,14 @@ def test_airtable_exists_by_inn_normalizes_value(monkeypatch):
     monkeypatch.setattr(client, "_request", fake_request)
     assert not client.exists_by_inn("tbltest", "7 707 083 893")
     assert captured["params"]["filterByFormula"] == '{Ключ ИНН}="7707083893"'
+
+
+def test_airtable_find_first_by_inn_returns_record(monkeypatch):
+    client = AirtableClient(FakeSettings())
+    monkeypatch.setattr(
+        client,
+        "_request",
+        lambda *args, **kwargs: {"records": [{"id": "recABC", "fields": {"ИНН": "7707083893"}}]},
+    )
+    record = client.find_first_by_inn("tbltest", "7 707 083 893")
+    assert record["id"] == "recABC"
