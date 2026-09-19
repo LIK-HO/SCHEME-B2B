@@ -335,11 +335,13 @@ class SearchService:
                 airtable_record_id = str(result.get("id") or "") if isinstance(result, dict) else ""
             except Exception as exc:
                 try:
-                    if not self.airtable.exists_by_inn(
+                    existing = self.airtable.find_first_by_inn(
                         self.settings.airtable_table_companies,
                         inn,
-                    ):
+                    )
+                    if not existing:
                         raise exc
+                    airtable_record_id = str(existing.get("id") or "")
                     outcome = "reconciled"
                     logger.warning(
                         "Airtable create outcome ambiguous; record already exists for INN %s",
