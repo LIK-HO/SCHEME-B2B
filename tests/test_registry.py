@@ -54,7 +54,8 @@ def test_bulk_source_reads_generic_record_variant(tmp_path: Path):
 def test_bulk_fns_verifier_confirms_exact_match(tmp_path: Path):
     path = tmp_path / "sample.xml"
     path.write_text(
-        '<EGRUL><СвЮЛ ИНН="7707083893" ОГРН="1027700132195" ПолнНаимОПФ="ООО РОМАШКА" КодРегион="77"/></EGRUL>',
+        '<EGRUL ДатаВыг="2026-09-18"><СвЮЛ ИНН="7707083893" ОГРН="1027700132195" '
+  "ПолнНаимОПФ=\"ООО РОМАШКА\" КодРегион=\"77\"/></EGRUL>',
         encoding="utf-8",
     )
 
