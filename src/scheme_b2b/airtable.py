@@ -87,15 +87,21 @@ class AirtableClient:
                 break
         return records
 
-    def exists_by_inn(self, table_id: str, inn: str) -> bool:
+    def find_first_by_inn(self, table_id: str, inn: str) -> dict[str, Any] | None:
         key = normalize_inn(inn)
+        if not key:
+            return None
         formula = f'{{Ключ ИНН}}="{key}"'
         payload = self._request(
             "GET",
             table_id,
             params={"pageSize": 1, "maxRecords": 1, "filterByFormula": formula},
         )
-        return bool(payload.get("records"))
+        records = payload.get("records", [])
+        return records[0] if records else None
+
+    def exists_by_inn(self, table_id: str, inn: str) -> bool:
+        return self.find_first_by_inn(table_id, inn) is not None
 
     def find_first_by_field(
         self,
