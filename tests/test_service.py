@@ -32,6 +32,9 @@ class FakeAirtable:
     def exists_by_inn(self, table_id, inn):
         return inn in self.keys
 
+    def find_first_by_inn(self, table_id, inn):
+        return {"id": "recTEST", "fields": {"ИНН": inn}} if inn in self.keys else None
+
     def create_record(self, table_id, fields):
         self.created.append((table_id, fields))
         self.keys.add(fields["ИНН"])
@@ -118,6 +121,10 @@ def test_run_once_reconciles_ambiguous_airtable_create(tmp_path: Path):
 
     assert result["status"] == "success"
     assert result["inserted"] == 1
+    with service.session_factory() as session:
+        item = session.query(RunItem).one()
+    assert item.outcome == "reconciled"
+    assert item.airtable_record_id == "recTEST"
 
 
 def test_run_once_skips_when_another_worker_holds_lease(tmp_path: Path):
