@@ -122,3 +122,12 @@ GitHub Actions используется как runner, а не как архит
 ## Production
 
 Для постоянной автоматизации рекомендуется persistent Docker/VPS runtime с локальным хранилищем snapshots и FNS index. GitHub Actions оставлен как CI и временный scheduler, но не используется как место хранения больших государственных выгрузок.
+
+
+## Граница системы
+
+Проект намеренно ограничен небольшим рабочим массивом: Discovery -> Normalize -> Identity/Dedup -> Verification/Freshness -> Qualification -> Core/Projection -> Run/Recovery -> Notification -> Operator UI. Это не заготовка универсальной CRM и не повод бесконечно добавлять подсистемы.
+
+Подробно: docs/SYSTEM_BOUNDARY.md и docs/OPERATOR_CONTRACT.md.
+
+После прохождения release gate действует stop rule: новые функции принимаются только при доказанной операторской пользе и понятном влиянии на надёжность.
