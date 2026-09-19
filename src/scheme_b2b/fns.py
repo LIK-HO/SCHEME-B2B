@@ -77,7 +77,7 @@ class FNSIndex:
         with sqlite3.connect(self.db_path) as db:
             row = db.execute(
                 "SELECT registry_id,inn,ogrn,ogrnip,company,address,status,source_date "
-                "FROM entity WHERE inn=? ORDER BY CASE WHEN status='active' THEN 0 ELSE 1 END, source_date DESC LIMIT 1",
+                "FROM entity WHERE inn=? ORDER BY source_date DESC LIMIT 1",
                 (key,),
             ).fetchone()
         return FNSRecord(*row) if row else None
@@ -131,7 +131,8 @@ class FNSIndex:
                 "VALUES(?,?,?,?,?,?,?,?) "
                 "ON CONFLICT(registry_id) DO UPDATE SET inn=excluded.inn,ogrn=excluded.ogrn,"
                 "ogrnip=excluded.ogrnip,company=excluded.company,address=excluded.address,"
-                "status=excluded.status,source_date=excluded.source_date",
+                "status=excluded.status,source_date=excluded.source_date "
+                "WHERE excluded.source_date >= entity.source_date",
                 (
                     record.registry_id,
                     record.inn,
@@ -220,7 +221,11 @@ class FNSIndex:
 
     @staticmethod
     def _address(element) -> str:
-        node = element.find("СвАдресЮЛ") or element.find("АдресЮЛ") or element.find("СвАдресИП")
+        node = element.find("СвАдресЮЛ")
+        if node is None:
+            node = element.find("АдресЮЛ")
+        if node is None:
+            node = element.find("СвАдресИП")
         if node is None:
             return ""
         values: list[str] = []
