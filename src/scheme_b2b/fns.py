@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from io import BytesIO
+from datetime import date
 from pathlib import Path
 import sqlite3
 import zipfile
+from collections.abc import Callable, Iterator
 
 from lxml import etree
 
@@ -77,7 +78,7 @@ class FNSIndex:
         with sqlite3.connect(self.db_path) as db:
             row = db.execute(
                 "SELECT registry_id,inn,ogrn,ogrnip,company,address,status,source_date "
-                "FROM entity WHERE inn=? ORDER BY source_date DESC LIMIT 1",
+                "FROM entity WHERE inn=? ORDER BY source_date DESC, registry_id ASC LIMIT 1",
                 (key,),
             ).fetchone()
         return FNSRecord(*row) if row else None
@@ -91,19 +92,23 @@ class FNSIndex:
         newest_date: str | None = None
 
         with sqlite3.connect(self.db_path) as db:
-            for stream in self._open_xml(source_path):
-                try:
+            for opener in self._open_xml(source_path):
+                with opener() as stream:
                     source_date = self._source_date(stream)
-                    if not source_date:
-                        continue
-                    newest_date = max(newest_date or source_date, source_date)
 
+                if not source_date:
+                    continue
+                newest_date = max(newest_date or source_date, source_date)
+
+                with opener() as stream:
                     for _, element in etree.iterparse(
                         stream,
                         events=("end",),
-                        tag=("СвЮЛ", "СвИП"),
                         recover=False,
                     ):
+                        if etree.QName(element).localname not in {"СвЮЛ", "СвИП"}:
+                            continue
+
                         record = self._parse(element, source_date)
                         if record:
                             db.execute(
@@ -127,47 +132,72 @@ class FNSIndex:
                                 ),
                             )
                             total += 1
+
                         element.clear()
                         parent = element.getparent()
                         if parent is not None:
                             while element.getprevious() is not None:
                                 del parent[0]
-                finally:
-                    stream.close()
 
             if not newest_date:
                 raise ValueError("В FNS snapshot отсутствует ДатаВыг")
+            self._validate_source_date(newest_date)
 
+            current = db.execute("SELECT source_date FROM meta WHERE id=1").fetchone()
+            current_date = current[0] if current else ""
+            meta_date = max(current_date, newest_date)
             db.execute(
                 "INSERT INTO meta(id,source_date) VALUES(1,?) "
                 "ON CONFLICT(id) DO UPDATE SET source_date=excluded.source_date",
-                (newest_date,),
+                (meta_date,),
             )
             db.commit()
 
         return total
 
     @staticmethod
-    def _open_xml(path: Path):
+    def _open_xml(path: Path) -> Iterator[Callable[[], object]]:
         if path.suffix.lower() == ".xml":
-            yield path.open("rb")
+            yield lambda: path.open("rb")
             return
 
         if path.suffix.lower() != ".zip":
             raise ValueError("FNS snapshot должен быть XML или ZIP")
 
-        with zipfile.ZipFile(path) as archive:
-            for info in archive.infolist():
-                if info.is_dir() or not info.filename.lower().endswith(".xml"):
-                    continue
-                yield BytesIO(archive.read(info.filename))
+        archive = zipfile.ZipFile(path)
+        try:
+            infos = [
+                info
+                for info in archive.infolist()
+                if not info.is_dir() and info.filename.lower().endswith(".xml")
+            ]
+            for info in infos:
+                yield lambda info=info: archive.open(info)
+        finally:
+            archive.close()
 
     @staticmethod
     def _source_date(stream) -> str:
-        stream.seek(0)
         for _, root in etree.iterparse(stream, events=("start",), recover=False):
             return root.get("ДатаВыг", "").strip()
         return ""
+
+    @staticmethod
+    def _validate_source_date(value: str) -> None:
+        try:
+            parsed = date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError("В FNS snapshot указана некорректная ДатаВыг") from exc
+        if parsed > date.today():
+            raise ValueError("В FNS snapshot указана будущая ДатаВыг")
+
+    @staticmethod
+    def _child(element, *names):
+        wanted = set(names)
+        for child in element:
+            if etree.QName(child).localname in wanted:
+                return child
+        return None
 
     @classmethod
     def _parse(cls, element, source_date: str) -> FNSRecord | None:
@@ -179,16 +209,14 @@ class FNSIndex:
             if not (len(i) == 10 and valid_inn(i) and valid_ogrn(o)):
                 return None
 
-            company = cls._company_name(element)
-            status = cls._company_status(element)
             return FNSRecord(
                 registry_id=o,
                 inn=i,
                 ogrn=o,
                 ogrnip="",
-                company=company,
+                company=cls._company_name(element),
                 address=cls._address(element),
-                status=status,
+                status=cls._company_status(element),
                 source_date=source_date,
             )
 
@@ -208,31 +236,36 @@ class FNSIndex:
             source_date=source_date,
         )
 
-    @staticmethod
-    def _company_name(element) -> str:
-        node = element.find("СвНаимЮЛ")
+    @classmethod
+    def _company_name(cls, element) -> str:
+        node = cls._child(element, "СвНаимЮЛ")
         if node is not None:
             value = node.get("НаимЮЛПолн") or node.get("НаимСокр")
             if value:
                 return text(value)
         return text(element.get("НаимЮЛПолн") or element.get("НаимСокр"))
 
-    @staticmethod
-    def _ip_name(element) -> str:
-        node = element.find("СвФЛ")
+    @classmethod
+    def _ip_name(cls, element) -> str:
+        node = cls._child(element, "СвФЛ")
         if node is not None:
-            parts = [node.get("ФамилияРус") or node.get("Фамилия"),
-                     node.get("ИмяРус") or node.get("Имя"),
-                     node.get("ОтчествоРус") or node.get("Отчество")]
+            parts = [
+                node.get("ФамилияРус") or node.get("Фамилия"),
+                node.get("ИмяРус") or node.get("Имя"),
+                node.get("ОтчествоРус") or node.get("Отчество"),
+            ]
             return text(" ".join(p for p in parts if p))
-        return text(" ".join(
-            p for p in (element.get("Фамилия"), element.get("Имя"), element.get("Отчество"))
-            if p
-        ))
+        return text(
+            " ".join(
+                p
+                for p in (element.get("Фамилия"), element.get("Имя"), element.get("Отчество"))
+                if p
+            )
+        )
 
-    @staticmethod
-    def _company_status(element) -> str:
-        status_node = element.find("СвСтатус")
+    @classmethod
+    def _company_status(cls, element) -> str:
+        status_node = cls._child(element, "СвСтатус")
         raw = ""
         if status_node is not None:
             raw = status_node.get("НаимСтатусЮЛ") or status_node.get("СтатусЮЛ") or ""
@@ -240,11 +273,11 @@ class FNSIndex:
             return "liquidated"
         return COMPANY_STATUS.get(raw.strip().lower(), "unknown")
 
-    @staticmethod
-    def _ip_status(element) -> str:
-        if element.find("СвПрекрИП") is not None:
+    @classmethod
+    def _ip_status(cls, element) -> str:
+        if cls._child(element, "СвПрекрИП") is not None:
             return "closed"
-        status_node = element.find("СвСтатус")
+        status_node = cls._child(element, "СвСтатус")
         raw = ""
         if status_node is not None:
             raw = status_node.get("НаимСтатусИП") or status_node.get("СтатусИП") or ""
@@ -252,11 +285,14 @@ class FNSIndex:
 
     @staticmethod
     def _address(element) -> str:
-        node = element.find("СвАдресЮЛ")
-        if node is None:
-            node = element.find("АдресЮЛ")
-        if node is None:
-            node = element.find("СвАдресИП")
+        node = None
+        for name in ("СвАдресЮЛ", "АдресЮЛ", "СвАдресИП"):
+            for child in element:
+                if etree.QName(child).localname == name:
+                    node = child
+                    break
+            if node is not None:
+                break
         if node is None:
             return ""
 
