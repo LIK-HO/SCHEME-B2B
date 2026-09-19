@@ -37,18 +37,14 @@ def ready() -> dict[str, str]:
         missing.append("AIRTABLE_TOKEN")
     else:
         try:
-            AirtableClient(settings).check_connection(settings.airtable_table_search)
+            profile = AirtableClient(settings).get_search_profile(settings)
+            if profile is None:
+                missing.append("SEARCH_PROFILE_NOT_FOUND")
         except Exception:
             missing.append("AIRTABLE_UNAVAILABLE")
     if not settings.api_key:
         missing.append("API_KEY")
     missing.extend(source_configuration_errors(settings))
-    if "AIRTABLE_UNAVAILABLE" not in missing:
-        try:
-            if AirtableClient(settings).get_search_profile(settings) is None:
-                missing.append("SEARCH_PROFILE_NOT_FOUND")
-        except Exception:
-            missing.append("AIRTABLE_PROFILE_UNAVAILABLE")
     fns_error = FNSVerifier(settings).readiness_error()
     if fns_error:
         missing.append(fns_error)
