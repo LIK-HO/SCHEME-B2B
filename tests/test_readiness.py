@@ -24,3 +24,25 @@ def test_readiness_rejects_insecure_remote_source():
     settings = Settings(source_json_url="http://example.invalid/source.json")
     errors = source_configuration_errors(settings)
     assert "SOURCE_JSON_URL must be a valid HTTPS URL" in errors
+
+
+
+def test_airtable_check_connection_uses_read_path(monkeypatch):
+    from scheme_b2b.airtable import AirtableClient
+
+    client = AirtableClient.__new__(AirtableClient)
+    captured = {}
+
+    def fake_request(method, table_id, **kwargs):
+        captured["method"] = method
+        captured["table_id"] = table_id
+        captured["params"] = kwargs["params"]
+        return {"records": []}
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    client.check_connection("tblSearch")
+    assert captured == {
+        "method": "GET",
+        "table_id": "tblSearch",
+        "params": {"pageSize": 1, "maxRecords": 1},
+    }
