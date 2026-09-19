@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SCHEME-B2B</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <div><strong>SCHEME-B2B</strong><span class="sub">ручной B2B-поиск</span></div>
+  <span id="health" class="dot"></span>
+</header>
+<main>
+  <section class="search">
+    <input id="q" placeholder="Компания, ИНН, сфера, потребность">
+    <button id="find">Найти</button>
+  </section>
+  <nav id="tabs" class="tabs"></nav>
+  <section id="content"></section>
+</main>
+<script>
+const tabs = [
+  ["Компания",""],
+  ["Клиент","Клиент"],
+  ["Архив","Архив"]
+];
+
+const tabBox = document.getElementById("tabs");
+tabs.forEach(function(t) {
+  const b = document.createElement("button");
+  b.textContent = t[0];
+  b.dataset.status = t[1];
+  b.onclick = function() {
+    document.querySelectorAll("#tabs button").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    loadCompanies();
+  };
+  tabBox.appendChild(b);
+});
+const extra = [["Источники","sources"],["Сферы","sectors"]];
+extra.forEach(function(t) {
+  const b = document.createElement("button");
+  b.textContent = t[0];
+  b.dataset.static = t[1];
+  b.onclick = function() {
+    document.querySelectorAll("#tabs button").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    loadStatic(t[1]);
+  };
+  tabBox.appendChild(b);
+});
+tabBox.firstChild.classList.add("active");
+document.getElementById("find").onclick = loadCompanies;
+document.getElementById("q").addEventListener("keydown", e => { if(e.key === "Enter") loadCompanies(); });
+
+function esc(v){return String(v ?? "").replace(/[&<>'"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\\"":"&quot;"}[c]});}
+
+async function loadCompanies(){
+  const active = document.querySelector("#tabs button.active");
+  const status = encodeURIComponent(active.dataset.status || "");
+  const q = encodeURIComponent(document.getElementById("q").value.trim());
+  const rows = await fetch("/api/companies?status="+status+"&q="+q).then(r=>r.json());
+  const box = document.getElementById("content");
+  if(!rows.length){box.innerHTML="<div class='empty'>Нет записей</div>";return;}
+  box.innerHTML="";
+  rows.forEach(function(x){
+    const card=document.createElement("article");
+    card.className="card";
+    card.innerHTML =
+      "<div class='row'><h3>"+esc(x.company)+"</h3><span class='badge'>"+esc(x.status)+"</span></div>"+
+      "<div class='meta'>ИНН "+esc(x.inn)+" · "+esc(x.sphere||"Сфера не указана")+"</div>"+
+      (x.need?"<p><b>Потребность:</b> "+esc(x.need)+"</p>":"")+
+      (x.need_evidence?"<p class='evidence'><b>Доказательство:</b> "+esc(x.need_evidence)+"</p>":"")+
+      "<div class='contacts'>"+
+      (x.phone?"<a href='tel:"+esc(x.phone)+"'>"+esc(x.phone)+"</a>":"")+
+      (x.email?"<a href='mailto:"+esc(x.email)+"'>"+esc(x.email)+"</a>":"")+
+      (x.website?"<a href='"+esc(x.website)+"' target='_blank' rel='noreferrer'>сайт</a>":"")+
+      "</div><div class='footer'><span>"+esc(x.address||"Адрес не указан")+"</span><span>ФНС: "+esc(x.fns_status)+"</span></div>"+
+      "<div class='actions'><button data-action='client'>Клиент</button><button data-action='archive'>Архив</button><button data-action='new' class='light'>Вернуть</button></div>";
+    card.querySelector("[data-action='client']").onclick=()=>setStatus(x.inn,"Клиент");
+    card.querySelector("[data-action='archive']").onclick=()=>setStatus(x.inn,"Архив");
+    card.querySelector("[data-action='new']").onclick=()=>setStatus(x.inn,"Новый");
+    box.appendChild(card);
+  });
+}
+async function setStatus(i,status){
+  await fetch("/api/companies/"+encodeURIComponent(i)+"/status",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});
+  loadCompanies();
+}
+async function loadStatic(type){
+  const rows=await fetch("/api/"+type).then(r=>r.json());
+  const box=document.getElementById("content");
+  box.innerHTML="";
+  rows.forEach(function(x){
+    const card=document.createElement("article");
+    card.className="card";
+    card.innerHTML="<div class='row'><h3>"+esc(x.source||x.sphere)+"</h3><span class='badge'>"+esc(x.type||x.relevance||"")+"</span></div>"+
+      "<p>"+esc(x.purpose||x.tasks||"")+"</p><div class='meta'>"+esc(x.class||x.signals||"")+"</div>"+
+      (x.site?"<a href='"+esc(x.site)+"' target='_blank' rel='noreferrer'>Открыть источник</a>":"");
+    box.appendChild(card);
+  });
+}
+fetch("/health").then(()=>document.getElementById("health").classList.add("ok"));
+loadCompanies();
+</script>
+</body>
+</html>
