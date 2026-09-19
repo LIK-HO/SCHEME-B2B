@@ -5,14 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "scheme-b2b"
 version = "0.1.0"
-description = "Simple manual B2B search and FNS verification tool."
+description = "Minimal manual B2B search verification core."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "fastapi>=0.115,<1",
   "lxml>=5,<7",
-  "pydantic>=2.8,<3",
-  "uvicorn[standard]>=0.30,<1",
 ]
 
 [project.optional-dependencies]
@@ -20,6 +17,9 @@ dev = [
   "pytest>=8.3,<9",
   "ruff>=0.8,<1",
 ]
+
+[project.scripts]
+scheme-b2b = "scheme_b2b.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

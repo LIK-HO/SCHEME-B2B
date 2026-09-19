@@ -2,7 +2,7 @@ from .normalize import inn, ogrn, ogrnip
 
 
 def _check(value: str, weights: list[int]) -> str:
-    return str(sum(int(d) * w for d, w in zip(value, weights, strict=True)) % 11 % 10)
+    return str(sum(int(d) * weight for d, weight in zip(value, weights, strict=True)) % 11 % 10)
 
 
 def valid_inn(value: str | None) -> bool:

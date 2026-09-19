@@ -4,77 +4,55 @@ import json
 import sys
 from pathlib import Path
 
-from .db import CompanyDB
 from .fns import FNSIndex
-from .normalize import email, name, ogrn, ogrnip, phone, website
+from .normalize import ogrn, ogrnip
 from .validate import validate_requisites
 
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("init-db | import-fns PATH | import-candidates PATH")
+        print("import-fns PATH | check INN [OGRN|OGRNIП]")
         return 2
 
     command = sys.argv[1]
 
-    if command == "init-db":
-        CompanyDB()
-        FNSIndex()
-        print("Готово")
-        return 0
-
     if command == "import-fns" and len(sys.argv) == 3:
         count = FNSIndex().import_snapshot(sys.argv[2])
-        print(f"Импортировано записей: {count}")
+        print(f"Обработано записей: {count}")
         return 0
 
-    if command == "import-candidates" and len(sys.argv) == 3:
-        payload = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
-        items = payload.get("companies", payload) if isinstance(payload, dict) else payload
-        if not isinstance(items, list):
-            raise ValueError("Ожидается массив или companies[]")
+    if command == "check" and len(sys.argv) in (3, 4):
+        raw_inn = sys.argv[2]
+        second = sys.argv[3] if len(sys.argv) == 4 else ""
+        raw_ogrn = ogrn(second)
+        raw_ogrnip = ogrnip(second)
+        ok, reason, i, o, p = validate_requisites(raw_inn, raw_ogrn, raw_ogrnip)
+        if not ok:
+            print(json.dumps({"ok": False, "reason": reason}, ensure_ascii=False))
+            return 1
 
-        db, fns = CompanyDB(), FNSIndex()
-        added = duplicates = rejected = 0
+        record = FNSIndex().get(i)
+        if record is None:
+            print(json.dumps(
+                {"ok": False, "reason": "ИНН не найден в индексе ФНС"},
+                ensure_ascii=False,
+            ))
+            return 1
 
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            ok, _, i, o, p = validate_requisites(item.get("inn"), item.get("ogrn"), item.get("ogrnip"))
-            if not ok:
-                rejected += 1
-                continue
-            record = fns.get(i)
-            if record is None or record.ogrn != o or record.ogrnip != p or not record.active:
-                rejected += 1
-                continue
-
-            row = dict(item)
-            row.update({
-                "company": name(item.get("company")) or record.company,
-                "inn": i,
-                "ogrn": ogrn(o),
-                "ogrnip": ogrnip(p),
-                "status": "Новый",
-                "sphere": name(item.get("sphere")),
-                "need": name(item.get("need")),
-                "need_evidence": name(item.get("need_evidence")),
-                "need_source": name(item.get("need_source")),
-                "phone": phone(item.get("phone")),
-                "email": email(item.get("email")),
-                "website": website(item.get("website")),
-                "address": record.address,
-                "source": name(item.get("source")),
-                "fns_status": "Действует",
-                "fns_checked_at": record.source_date,
-            })
-            if db.add(row):
-                added += 1
-            else:
-                duplicates += 1
-
-        print(f"Добавлено: {added}; дубликатов: {duplicates}; отклонено: {rejected}")
-        return 0
+        matches = (record.ogrn == o and record.ogrnip == p)
+        result = {
+            "ok": matches and record.active,
+            "status": "Действует" if record.active else "Не действует",
+            "company": record.company,
+            "inn": record.inn,
+            "ogrn": record.ogrn,
+            "ogrnip": record.ogrnip,
+            "address": record.address,
+            "source_date": record.source_date,
+            "requisites_match": matches,
+        }
+        print(json.dumps(result, ensure_ascii=False))
+        return 0 if result["ok"] else 1
 
     print("Неверная команда или аргументы")
     return 2

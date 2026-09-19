@@ -3,7 +3,8 @@ from scheme_b2b.validate import validate_requisites
 
 def test_valid_company_pair():
     ok, reason, inn, ogrn, ogrnip = validate_requisites("7707083893", "1027700132195")
-    assert ok and reason == "OK"
+    assert ok
+    assert reason == "OK"
     assert inn == "7707083893"
     assert ogrn == "1027700132195"
     assert not ogrnip
