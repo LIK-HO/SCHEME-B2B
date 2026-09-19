@@ -66,6 +66,13 @@ class AirtableClient:
 
         raise AirtableError(last_error or "Airtable request failed")
 
+    def check_connection(self, table_id: str) -> None:
+        self._request(
+            "GET",
+            table_id,
+            params={"pageSize": 1, "maxRecords": 1},
+        )
+
     def list_records(
         self,
         table_id: str,
